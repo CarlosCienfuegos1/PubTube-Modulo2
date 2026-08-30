@@ -5,10 +5,13 @@ from dotenv import load_dotenv
 # Cargar variables del .env
 load_dotenv()
 
-RABBITMQ_HOST = os.getenv("RABBITMQ_HOST", "localhost")
-RABBITMQ_PORT = int(os.getenv("RABBITMQ_PORT", 5672))
-RABBITMQ_USER = os.getenv("RABBITMQ_USER", "admin")
-RABBITMQ_PASS = os.getenv("RABBITMQ_PASS", "admin123")
+# Fail-fast: si falta alguna variable, el script debe fallar explícitamente
+# en vez de conectarse silenciosamente con credenciales por defecto.
+RABBITMQ_HOST = os.environ["RABBITMQ_HOST"]
+RABBITMQ_PORT = int(os.environ["RABBITMQ_PORT"])
+RABBITMQ_USER = os.environ["RABBITMQ_USER"]
+RABBITMQ_PASS = os.environ["RABBITMQ_PASS"]
+
 
 def setup():
     # Configurar credenciales
@@ -32,7 +35,9 @@ def setup():
     )
     print(f"Exchange '{exchange_name}' de tipo 'topic' creado o verificado exitosamente.")
 
-    # Opcionalmente, para pruebas rápidas podemos crear una cola genérica
+
+    # las colas por consumidor real
+    # se implementan en Sprint 1.
     queue_name = 'test_queue'
     channel.queue_declare(queue=queue_name, durable=True)
     channel.queue_bind(exchange=exchange_name, queue=queue_name, routing_key='#')
@@ -40,6 +45,7 @@ def setup():
 
     connection.close()
     print("Configuración completada.")
+
 
 if __name__ == "__main__":
     setup()
