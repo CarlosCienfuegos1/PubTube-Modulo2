@@ -20,6 +20,16 @@ Para garantizar el aprendizaje integral de todos los integrantes, los roles rota
   3. [Ignacio Manriquez]
 
 ## Sprint 1
+
+- Product Owner: [Adolfo Gayoso]
+- Scrum Master: [Angel Rocha]
+- Equipo de Desarrollo: 
+  1. [Carlos Cienfuegos]
+  2. [Eduardo Krause]
+  3. [Ignacio Manriquez]
+     
+
+## Sprint 2
 - Product Owner: [Eduardo Krause]
 - Scrum Master: [Carlos Cienfuegos]
 - Equipo de Desarrollo: 
@@ -27,7 +37,9 @@ Para garantizar el aprendizaje integral de todos los integrantes, los roles rota
   2. [Angel Rocha]
   3. [Ignacio Manriquez]
 
-## Sprint 2
+
+
+## Sprint 3
 - Product Owner: [Carlos Cienfuegos]
 - Scrum Master: [Eduardo Krause]
 - Equipo de Desarrollo: 
@@ -35,18 +47,11 @@ Para garantizar el aprendizaje integral de todos los integrantes, los roles rota
   2. [Angel Rocha]
   3. [Ignacio MAnriquez]
 
-## Sprint 3
+
+## Sprint 4
 - Product Owner: [Angel Rocha]
 - Scrum Master: [Ignacio Manriquez]
 - Equipo de Desarrollo: 
   1. [Carlos Cienfuegos]
   2. [Eduardo Krause]
   3. [Adolfo Gayoso]
-
-## Sprint 4
-- Product Owner: [Ignacio Manriquez]
-- Scrum Master: [Adolfo Gayoso]
-- Equipo de Desarrollo: 
-  1. [Carlos Cienfuegos]
-  2. [Eduardo Krause]
-  3. [Angel Rocha]
