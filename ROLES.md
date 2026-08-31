@@ -12,41 +12,43 @@ Para garantizar el aprendizaje integral de todos los integrantes, los roles rota
 ---
 
 ## Sprint 0
-- Product Owner: [Nombre]
-- Scrum Master: [Nombre]
+- Product Owner: [Adolfo Gayoso]
+- Scrum Master: [Angel Rocha]
 - Equipo de Desarrollo: 
   1. [Carlos Cienfuegos]
-  2. [Nombre]
-  3. [Nombre]
+  2. [Eduardo Krause]
+  3. [Ignacio Manriquez]
 
 ## Sprint 1
-- Product Owner: [Nombre]
-- Scrum Master: [Nombre]
+- Product Owner: [Eduardo Krause]
+- Scrum Master: [Carlos Cienfuegos]
 - Equipo de Desarrollo: 
-  1. [Nombre]
-  2. [Nombre]
-  3. [Nombre]
+  1. [Adolfo Gayoso]
+  2. [Angel Rocha]
+  3. [Ignacio Manriquez]
 
 ## Sprint 2
-- Product Owner: [Nombre]
-- Scrum Master: [Nombre]
+- Product Owner: [Carlos Cienfuegos]
+- Scrum Master: [Eduardo Krause]
 - Equipo de Desarrollo: 
-  1. [Nombre]
-  2. [Nombre]
-  3. [Nombre]
+  1. [Adolfo Gayoso]
+  2. [Angel Rocha]
+  3. [Ignacio MAnriquez]
 
 ## Sprint 3
-- Product Owner: [Nombre]
-- Scrum Master: [Nombre]
+- Product Owner: [Angel Rocha]
+- Scrum Master: [Ignacio Manriquez]
 - Equipo de Desarrollo: 
-  1. [Nombre]
-  2. [Nombre]
-  3. [Nombre]
+  1. [Carlos Cienfuegos]
+  2. [Eduardo Krause]
+  3. [Adolfo Gayoso]
 
 ## Sprint 4
-- Product Owner: [Nombre]
-- Scrum Master: [Nombre]
+- Product Owner: [Ignacio Manriquez]
+- Scrum Master: [Adolfo Gayoso]
 - Equipo de Desarrollo: 
-  1. [Nombre]
-  2. [Nombre]
-  3. [Nombre]
+  1. [Carlos Cienfuegos]
+  2. [Eduardo Krause]
+  3. [Angel Rocha]
+  4. [Nombre]
+  5. [Nombre]
