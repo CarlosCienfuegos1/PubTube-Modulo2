@@ -3,7 +3,7 @@ venv/
 env/
 .venv/
 
-# Variables de entorno
+# Variables de entorno (contienen credenciales locales, nunca subir al repo)
 .env
 
 # Archivos de caché de Python
@@ -14,3 +14,6 @@ __pycache__/
 
 # Carpetas de dependencias y logs
 .pytest_cache/
+
+# IDE y editores
+.vscode/

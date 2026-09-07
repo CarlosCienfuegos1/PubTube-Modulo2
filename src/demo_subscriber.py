@@ -1,15 +1,5 @@
 import pika
-import os
-from dotenv import load_dotenv
-
-load_dotenv()
-
-# Fail-fast: si falta alguna variable, el script debe fallar explícitamente
-# en vez de conectarse silenciosamente con credenciales por defecto.
-RABBITMQ_HOST = os.environ["RABBITMQ_HOST"]
-RABBITMQ_PORT = int(os.environ["RABBITMQ_PORT"])
-RABBITMQ_USER = os.environ["RABBITMQ_USER"]
-RABBITMQ_PASS = os.environ["RABBITMQ_PASS"]
+from config import RABBITMQ_HOST, RABBITMQ_PORT, RABBITMQ_USER, RABBITMQ_PASS
 
 
 def callback(ch, method, properties, body):
@@ -30,8 +20,9 @@ def consume_events():
 
     connection = pika.BlockingConnection(parameters)
     channel = connection.channel()
-    queue_name = 'test_queue'
-    print(f"[*] Esperando eventos en '{queue_name}'. Presiona CTRL+C para salir.")
+    # Consumimos de la cola real del Módulo 4 (vinculada a m1.video.uploaded en definitions.json)
+    queue_name = 'q.m4.experience'
+    print(f"[*] Esperando eventos en '{queue_name}' (Consumidor M4). Presiona CTRL+C para salir.")
 
     channel.basic_consume(
         queue=queue_name,

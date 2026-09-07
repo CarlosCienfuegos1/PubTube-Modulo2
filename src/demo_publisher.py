@@ -1,17 +1,7 @@
-import pika
-import os
 import uuid
-from dotenv import load_dotenv
+import pika
+from config import RABBITMQ_HOST, RABBITMQ_PORT, RABBITMQ_USER, RABBITMQ_PASS
 from envelope import EventEnvelope
-
-load_dotenv()
-
-# Fail-fast: si falta alguna variable, el script debe fallar explícitamente
-# en vez de conectarse silenciosamente con credenciales por defecto.
-RABBITMQ_HOST = os.environ["RABBITMQ_HOST"]
-RABBITMQ_PORT = int(os.environ["RABBITMQ_PORT"])
-RABBITMQ_USER = os.environ["RABBITMQ_USER"]
-RABBITMQ_PASS = os.environ["RABBITMQ_PASS"]
 
 
 def publish_event():
@@ -23,7 +13,7 @@ def publish_event():
 
     # 1. Crear el objeto con el Envelope acordado
     evento = EventEnvelope(
-        type="video.uploaded",
+        type="m1.video.uploaded",
         correlationId=str(uuid.uuid4()),  # Generamos un ID de flujo simulado
         payload={
             "contentId": "video_12345",
@@ -33,9 +23,8 @@ def publish_event():
     )
 
     # 2. Publicar al Exchange usando el modelo convertido a JSON.
-    # La routing key debe coincidir exactamente con el catálogo de eventos
-    # acordado (sección 6.1 del documento del proyecto): "video.uploaded"
-    routing_key = "video.uploaded"
+    # La routing key sigue la convención acordada: <módulo>.<entidad>.<evento>
+    routing_key = "m1.video.uploaded"
 
     channel.basic_publish(
         exchange='pubtube.events',

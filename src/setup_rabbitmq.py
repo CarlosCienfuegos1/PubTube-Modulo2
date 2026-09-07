@@ -1,16 +1,5 @@
 import pika
-import os
-from dotenv import load_dotenv
-
-# Cargar variables del .env
-load_dotenv()
-
-# Fail-fast: si falta alguna variable, el script debe fallar explícitamente
-# en vez de conectarse silenciosamente con credenciales por defecto.
-RABBITMQ_HOST = os.environ["RABBITMQ_HOST"]
-RABBITMQ_PORT = int(os.environ["RABBITMQ_PORT"])
-RABBITMQ_USER = os.environ["RABBITMQ_USER"]
-RABBITMQ_PASS = os.environ["RABBITMQ_PASS"]
+from config import RABBITMQ_HOST, RABBITMQ_PORT, RABBITMQ_USER, RABBITMQ_PASS
 
 
 def setup():
@@ -36,15 +25,29 @@ def setup():
     print(f"Exchange '{exchange_name}' de tipo 'topic' creado o verificado exitosamente.")
 
 
-    # las colas por consumidor real
-    # se implementan en Sprint 1.
-    queue_name = 'test_queue'
-    channel.queue_declare(queue=queue_name, durable=True)
-    channel.queue_bind(exchange=exchange_name, queue=queue_name, routing_key='#')
-    print(f"Cola '{queue_name}' enlazada al exchange para escuchar todo ('#').")
+    # Declarar colas y bindings por consumidor oficial (coincidente con definitions.json)
+    queues_bindings = [
+        ("q.m1.content", ["m3.publish.completed"]),
+        ("q.m3.publish", ["m1.metadata.updated"]),
+        ("q.m4.experience", [
+            "m1.video.uploaded",
+            "m1.metadata.updated",
+            "m3.publish.scheduled",
+            "m3.publish.completed",
+            "m3.publish.failed",
+            "m4.team.notified"
+        ]),
+        ("q.m2.event_store", ["#"])
+    ]
+
+    for queue_name, routing_keys in queues_bindings:
+        channel.queue_declare(queue=queue_name, durable=True)
+        for rk in routing_keys:
+            channel.queue_bind(exchange=exchange_name, queue=queue_name, routing_key=rk)
+        print(f"Cola '{queue_name}' configurada con bindings: {routing_keys}")
 
     connection.close()
-    print("Configuración completada.")
+    print("Configuración completada exitosamente.")
 
 
 if __name__ == "__main__":

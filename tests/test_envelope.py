@@ -41,13 +41,13 @@ def test_envelope_causationId_es_opcional():
 def test_envelope_requiere_type():
     """'type' es obligatorio: sin él, la validación debe fallar."""
     with pytest.raises(ValidationError):
-        EventEnvelope(correlationId="abc-123")
+        EventEnvelope(correlationId="abc-123")  # type: ignore
 
 
 def test_envelope_requiere_correlationId():
     """'correlationId' es obligatorio: sin él, la validación debe fallar."""
     with pytest.raises(ValidationError):
-        EventEnvelope(type="video.uploaded")
+        EventEnvelope(type="video.uploaded")  # type: ignore
 
 
 def test_envelope_serializa_a_json_valido():
