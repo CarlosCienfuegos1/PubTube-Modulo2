@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [ "$(id -u)" = '0' ]; then
+    chown -R rabbitmq:rabbitmq /var/lib/rabbitmq
+    exec gosu rabbitmq "$BASH_SOURCE" "$@"
+fi
+
 USER="${RABBITMQ_USER:-admin}"
 PASS="${RABBITMQ_PASS:-admin123}"
 
