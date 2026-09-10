@@ -73,3 +73,11 @@ def test_envelope_acepta_payload_anidado():
     payload = {"contentId": "video_1", "meta": {"size": 123, "format": "mp4"}}
     evento = EventEnvelope(type="video.uploaded", correlationId="abc-123", payload=payload)
     assert evento.payload == payload
+
+def test_envelope_ignora_campos_nuevos_forward_compatibility():
+    """El campo version permite agregar campos nuevos sin romper consumidores existentes."""
+    json_futuro = '{"id": "1", "type": "test", "version": 2, "timestamp": "2026-01-01T00:00:00Z", "correlationId": "abc", "nuevo_campo_del_futuro": "hola", "payload": {}}'
+    # No debe arrojar ValidationError, simplemente lo descarta
+    evento = EventEnvelope.deserialize(json_futuro)
+    assert evento.version == 2
+    assert not hasattr(evento, "nuevo_campo_del_futuro")
