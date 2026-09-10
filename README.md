@@ -96,9 +96,14 @@ El broker dispone del Exchange principal de tipo **Topic** denominado **`pubtube
 | **`q.m2.event_store`** | Módulo 2 | `#` *(todos los eventos)* | Auditoría global, almacenamiento histórico de eventos y orquestación de Sagas. |
 
 ## Estructura del Proyecto
-- `src/`: Código fuente en Python (Envelope, setup, simuladores, configuración).
-- `rabbitmq/`: Definiciones de infraestructura (`definitions.json`, `rabbitmq.conf`).
-- `secrets/`: Archivos locales y plantillas de secretos (Docker Secrets).
+- `src/event_bus.py`: **SDK interno de pub/sub** con reconexión automática (US-B1b).
+- `src/envelope.py`: Modelo y validación del `EventEnvelope` versionado (US-B2a).
+- `src/config.py`: Carga de credenciales desde `.env`.
+- `src/demo_publisher.py`: Ejemplo de publicación usando el SDK.
+- `src/demo_subscriber.py`: Ejemplo de suscripción usando el SDK.
+- `src/setup_rabbitmq.py`: Script declarativo de topología (Exchanges, Colas, Bindings).
+- `rabbitmq/`: Definiciones de infraestructura (`definitions.json`, `rabbitmq.conf`, `entrypoint.sh`).
+- `schemas/`: JSON Schema oficial del `EventEnvelope`.
 - `tests/`: Batería de pruebas unitarias y de integración.
 - `ADR/`: Architecture Decision Records con el historial de decisiones técnicas tomadas.
 - `ROLES.md`: Definición del equipo Scrum encargado de este módulo.
