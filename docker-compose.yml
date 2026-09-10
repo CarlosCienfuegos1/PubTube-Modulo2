@@ -23,5 +23,24 @@ services:
       retries: 5
     restart: unless-stopped
 
+  postgres:
+    image: postgres:16-alpine
+    container_name: pubtube-postgres
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pubtube}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pubtube}
+      POSTGRES_DB: ${POSTGRES_DB:-pubtube_events}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pubtube} -d ${POSTGRES_DB:-pubtube_events}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
 volumes:
   rabbitmq_data:
+  postgres_data:
