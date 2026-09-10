@@ -27,3 +27,13 @@ class EventEnvelope(BaseModel):
     
     # El cuerpo del evento
     payload: Dict[str, Any] = Field(default_factory=dict)
+
+    def serialize(self) -> str:
+        """Serializa el evento a un string JSON."""
+        return self.model_dump_json()
+
+    @classmethod
+    def deserialize(cls, json_str: str) -> 'EventEnvelope':
+        """Deserializa y valida un string JSON convirtiéndolo en un EventEnvelope.
+        Lanza ValidationError si el JSON no cumple con el esquema."""
+        return cls.model_validate_json(json_str)

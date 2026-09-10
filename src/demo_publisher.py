@@ -1,45 +1,31 @@
+"""
+demo_publisher.py — Ejemplo de publicación usando el SDK event_bus (US-B1b).
+
+Muestra cómo cualquier módulo (M1, M3, M4...) publica un evento al exchange
+'pubtube.events' usando la librería interna, sin escribir código de pika.
+
+Uso:
+    python src/demo_publisher.py
+"""
 import uuid
-import pika
-from config import RABBITMQ_HOST, RABBITMQ_PORT, RABBITMQ_USER, RABBITMQ_PASS
-from envelope import EventEnvelope
+import logging
+from event_bus import publish_event
+
+logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
 
-def publish_event():
-    credentials = pika.PlainCredentials(RABBITMQ_USER, RABBITMQ_PASS)
-    parameters = pika.ConnectionParameters(host=RABBITMQ_HOST, port=RABBITMQ_PORT, credentials=credentials)
-
-    connection = pika.BlockingConnection(parameters)
-    channel = connection.channel()
-
-    # 1. Crear el objeto con el Envelope acordado
-    evento = EventEnvelope(
-        type="m1.video.uploaded",
-        correlationId=str(uuid.uuid4()),  # Generamos un ID de flujo simulado
+def main() -> None:
+    envelope = publish_event(
+        routing_key="m1.video.uploaded",
+        correlation_id=str(uuid.uuid4()),
         payload={
             "contentId": "video_12345",
             "checksum": "a8f5f167f44f...",
-            "storageUrl": "https://s3.demo.com/videos/video_12345.mp4"
-        }
+            "storageUrl": "https://s3.demo.com/videos/video_12345.mp4",
+        },
     )
-
-    # 2. Publicar al Exchange usando el modelo convertido a JSON.
-    # La routing key sigue la convención acordada: <módulo>.<entidad>.<evento>
-    routing_key = "m1.video.uploaded"
-
-    channel.basic_publish(
-        exchange='pubtube.events',
-        routing_key=routing_key,
-        body=evento.model_dump_json(),  # Pydantic serializa a JSON directamente
-        properties=pika.BasicProperties(
-            delivery_mode=2,  # persistent: sobrevive a un reinicio del broker
-            content_type='application/json'
-        )
-    )
-
-    print(f"[x] Evento enviado a '{routing_key}' con correlationId: {evento.correlationId}")
-    connection.close()
+    print(f"[OK] Evento publicado: type='{envelope.type}', id='{envelope.id}'")
 
 
 if __name__ == "__main__":
-    publish_event()
-
+    main()

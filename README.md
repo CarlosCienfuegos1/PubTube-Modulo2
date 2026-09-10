@@ -151,9 +151,15 @@ El Event Store persiste **todos** los eventos que circulan por `pubtube.events` 
 El consumidor (`src/event_store_consumer.py`) usa **ack manual**: si la inserción en PostgreSQL falla, el mensaje se vuelve a encolar (`nack` + `requeue=True`) en vez de perderse.
 
 ## Estructura del Proyecto
-- `src/`: Código fuente en Python (Envelope, setup, event store, simuladores, configuración).
-- `rabbitmq/`: Definiciones de infraestructura (`definitions.json`, `rabbitmq.conf`).
+- `src/event_bus.py`: **SDK interno de pub/sub** con reconexión automática (US-B1b).
+- `src/envelope.py`: Modelo y validación del `EventEnvelope` versionado (US-B2a).
+- `src/config.py`: Carga de credenciales desde `.env`.
+- `src/demo_publisher.py`: Ejemplo de publicación usando el SDK.
+- `src/demo_subscriber.py`: Ejemplo de suscripción usando el SDK.
+- `src/setup_rabbitmq.py`: Script declarativo de topología (Exchanges, Colas, Bindings).
+- `rabbitmq/`: Definiciones de infraestructura (`definitions.json`, `rabbitmq.conf`, `entrypoint.sh`).
+- `schemas/`: JSON Schema oficial del `EventEnvelope`.
 - `tests/`: Batería de pruebas unitarias y de integración.
 - `ADR/`: Architecture Decision Records con el historial de decisiones técnicas tomadas.
 - `ROLES.md`: Definición del equipo Scrum encargado de este módulo.
-- `docker-compose.yml`: Definición de los servicios de contenedores requeridos (RabbitMQ + PostgreSQL).
+- `docker-compose.yml`: Definición de los servicios de contenedores requeridos.
