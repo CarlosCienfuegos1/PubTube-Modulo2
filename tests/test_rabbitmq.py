@@ -9,22 +9,14 @@ sin necesitar un broker levantado, si así lo definen más adelante).
 Correr con:
     pytest tests/test_integration_rabbitmq.py -v
 """
-import os
 import uuid
 import time
-
 import pika
+import pika.exceptions
 import pytest
-from dotenv import load_dotenv
 
+from config import RABBITMQ_HOST, RABBITMQ_PORT, RABBITMQ_USER, RABBITMQ_PASS
 from envelope import EventEnvelope
-
-load_dotenv()
-
-RABBITMQ_HOST = os.environ["RABBITMQ_HOST"]
-RABBITMQ_PORT = int(os.environ["RABBITMQ_PORT"])
-RABBITMQ_USER = os.environ["RABBITMQ_USER"]
-RABBITMQ_PASS = os.environ["RABBITMQ_PASS"]
 
 EXCHANGE_NAME = "pubtube.events"
 

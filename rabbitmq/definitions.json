@@ -1,0 +1,123 @@
+{
+    "rabbit_version": "4.0.0",
+    "vhosts": [
+        {
+            "name": "/"
+        }
+    ],
+    "exchanges": [
+        {
+            "name": "pubtube.events",
+            "vhost": "/",
+            "type": "topic",
+            "durable": true,
+            "auto_delete": false,
+            "internal": false,
+            "arguments": {}
+        }
+    ],
+    "queues": [
+        {
+            "name": "q.m1.content",
+            "vhost": "/",
+            "durable": true,
+            "auto_delete": false,
+            "arguments": {}
+        },
+        {
+            "name": "q.m3.publish",
+            "vhost": "/",
+            "durable": true,
+            "auto_delete": false,
+            "arguments": {}
+        },
+        {
+            "name": "q.m4.experience",
+            "vhost": "/",
+            "durable": true,
+            "auto_delete": false,
+            "arguments": {}
+        },
+        {
+            "name": "q.m2.event_store",
+            "vhost": "/",
+            "durable": true,
+            "auto_delete": false,
+            "arguments": {}
+        }
+    ],
+    "bindings": [
+        {
+            "source": "pubtube.events",
+            "vhost": "/",
+            "destination": "q.m1.content",
+            "destination_type": "queue",
+            "routing_key": "m3.publish.completed",
+            "arguments": {}
+        },
+        {
+            "source": "pubtube.events",
+            "vhost": "/",
+            "destination": "q.m3.publish",
+            "destination_type": "queue",
+            "routing_key": "m1.metadata.updated",
+            "arguments": {}
+        },
+        {
+            "source": "pubtube.events",
+            "vhost": "/",
+            "destination": "q.m4.experience",
+            "destination_type": "queue",
+            "routing_key": "m1.video.uploaded",
+            "arguments": {}
+        },
+        {
+            "source": "pubtube.events",
+            "vhost": "/",
+            "destination": "q.m4.experience",
+            "destination_type": "queue",
+            "routing_key": "m1.metadata.updated",
+            "arguments": {}
+        },
+        {
+            "source": "pubtube.events",
+            "vhost": "/",
+            "destination": "q.m4.experience",
+            "destination_type": "queue",
+            "routing_key": "m3.publish.scheduled",
+            "arguments": {}
+        },
+        {
+            "source": "pubtube.events",
+            "vhost": "/",
+            "destination": "q.m4.experience",
+            "destination_type": "queue",
+            "routing_key": "m3.publish.completed",
+            "arguments": {}
+        },
+        {
+            "source": "pubtube.events",
+            "vhost": "/",
+            "destination": "q.m4.experience",
+            "destination_type": "queue",
+            "routing_key": "m3.publish.failed",
+            "arguments": {}
+        },
+        {
+            "source": "pubtube.events",
+            "vhost": "/",
+            "destination": "q.m4.experience",
+            "destination_type": "queue",
+            "routing_key": "m4.team.notified",
+            "arguments": {}
+        },
+        {
+            "source": "pubtube.events",
+            "vhost": "/",
+            "destination": "q.m2.event_store",
+            "destination_type": "queue",
+            "routing_key": "#",
+            "arguments": {}
+        }
+    ]
+}
