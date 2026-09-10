@@ -80,4 +80,25 @@ def test_envelope_ignora_campos_nuevos_forward_compatibility():
     # No debe arrojar ValidationError, simplemente lo descarta
     evento = EventEnvelope.deserialize(json_futuro)
     assert evento.version == 2
-    assert not hasattr(evento, "nuevo_campo_del_futuro")
+    assert not hasattr(evento, "nuevo_campo_del_futuro")
+
+def test_envelope_propagacion_flujo_3_eventos():
+    """Prueba la propagación de correlationId y causationId en una cadena de 3 eventos (US-B2b)."""
+    # Evento 1: Origen (ej: usuario sube video)
+    evento1 = EventEnvelope(type="video.uploaded", correlationId="flujo-123")
+    
+    # Evento 2: Consecuencia del evento 1 (ej: video procesado)
+    evento2 = EventEnvelope.create_child_from(evento1, "video.processed")
+    
+    # Evento 3: Consecuencia del evento 2 (ej: notificación enviada)
+    evento3 = EventEnvelope.create_child_from(evento2, "notification.sent")
+    
+    # Verificaciones del flujo
+    assert evento1.correlationId == "flujo-123"
+    assert evento1.causationId is None
+    
+    assert evento2.correlationId == "flujo-123"
+    assert evento2.causationId == evento1.id
+    
+    assert evento3.correlationId == "flujo-123"
+    assert evento3.causationId == evento2.id
