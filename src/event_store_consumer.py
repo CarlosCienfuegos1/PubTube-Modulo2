@@ -13,6 +13,7 @@ import pika
 from config import RABBITMQ_HOST, RABBITMQ_PORT, RABBITMQ_USER, RABBITMQ_PASS
 from envelope import EventEnvelope
 from event_store import init_db, insert_event
+from reliability import route_failed_message
 
 QUEUE_NAME = "q.m2.event_store"
 
@@ -32,10 +33,9 @@ def callback(ch, method, properties, body):
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
     except Exception as exc:
-        # Si falla la validación o la persistencia,
-        # vuelve a la cola para reintentar en vez de perderse silenciosamente.
+        # Los fallos transitorios usan backoff; los permanentes terminan en DLQ.
         print(f"[event_store] ERROR al procesar evento (routing_key={method.routing_key}): {exc}")
-        ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
+        route_failed_message(ch, QUEUE_NAME, method, properties, body, exc)
 
 
 def main():

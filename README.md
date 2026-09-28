@@ -148,7 +148,23 @@ El Event Store persiste **todos** los eventos que circulan por `pubtube.events` 
 | `payload` | `JSONB` | Cuerpo del evento. |
 | `received_at` | `TIMESTAMPTZ` | Timestamp real de cuándo el Event Store lo persistió (no confundir con `timestamp`, que es de creación). |
 
-El consumidor (`src/event_store_consumer.py`) usa **ack manual**: si la inserción en PostgreSQL falla, el mensaje se vuelve a encolar (`nack` + `requeue=True`) en vez de perderse.
+El consumidor (`src/event_store_consumer.py`) usa **ack manual** y una política de entrega confiable: un fallo se publica en la cola de retry con backoff de 1s, 2s y 4s; al agotar 3 intentos se envía a `q.m2.event_store.dlq`. La misma política aplica a las colas de M1, M3 y M4.
+
+### DLQ, reintentos e inspección
+
+RabbitMQ declara un exchange de retry (`pubtube.events.retry`) y un exchange DLQ (`pubtube.events.dlq`). Cada cola principal tiene una cola `.retry` durable con TTL máximo de 30s y una cola `.dlq` durable. El SDK usa el header `x-death` para contar entregas, conserva los headers del mensaje y calcula un backoff exponencial limitado; después de 3 entregas confirma el original solo cuando la copia fue publicada en la DLQ.
+
+Para registrar fallos críticos y revisar mensajes:
+```bash
+python src/dlq_inspector.py q.m4.experience
+```
+
+Para reprocesarlos manualmente hacia `pubtube.events`:
+```bash
+python src/dlq_inspector.py q.m4.experience --reprocess
+```
+
+También pueden inspeccionarse y publicarse desde la pestaña **Queues** de RabbitMQ Management (`http://127.0.0.1:15672`). Al cambiar una cola existente a esta topología, recrea el volumen de RabbitMQ (`docker compose down -v`) antes de levantarlo de nuevo, porque RabbitMQ no permite modificar argumentos de una cola ya creada.
 
 ## Estructura del Proyecto
 - `src/event_bus.py`: **SDK interno de pub/sub** con reconexión automática (US-B1b).

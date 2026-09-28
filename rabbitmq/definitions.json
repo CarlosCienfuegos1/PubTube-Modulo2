@@ -14,6 +14,24 @@
             "auto_delete": false,
             "internal": false,
             "arguments": {}
+        },
+        {
+            "name": "pubtube.events.retry",
+            "vhost": "/",
+            "type": "direct",
+            "durable": true,
+            "auto_delete": false,
+            "internal": false,
+            "arguments": {}
+        },
+        {
+            "name": "pubtube.events.dlq",
+            "vhost": "/",
+            "type": "direct",
+            "durable": true,
+            "auto_delete": false,
+            "internal": false,
+            "arguments": {}
         }
     ],
     "queues": [
@@ -22,24 +40,108 @@
             "vhost": "/",
             "durable": true,
             "auto_delete": false,
-            "arguments": {}
+            "arguments": {
+                "x-dead-letter-exchange": "pubtube.events.retry",
+                "x-dead-letter-routing-key": "q.m1.content"
+            }
         },
         {
             "name": "q.m3.publish",
             "vhost": "/",
             "durable": true,
             "auto_delete": false,
-            "arguments": {}
+            "arguments": {
+                "x-dead-letter-exchange": "pubtube.events.retry",
+                "x-dead-letter-routing-key": "q.m3.publish"
+            }
         },
         {
             "name": "q.m4.experience",
             "vhost": "/",
             "durable": true,
             "auto_delete": false,
-            "arguments": {}
+            "arguments": {
+                "x-dead-letter-exchange": "pubtube.events.retry",
+                "x-dead-letter-routing-key": "q.m4.experience"
+            }
         },
         {
             "name": "q.m2.event_store",
+            "vhost": "/",
+            "durable": true,
+            "auto_delete": false,
+            "arguments": {
+                "x-dead-letter-exchange": "pubtube.events.retry",
+                "x-dead-letter-routing-key": "q.m2.event_store"
+            }
+        },
+        {
+            "name": "q.m1.content.retry",
+            "vhost": "/",
+            "durable": true,
+            "auto_delete": false,
+            "arguments": {
+                "x-message-ttl": 30000,
+                "x-dead-letter-exchange": "",
+                "x-dead-letter-routing-key": "q.m1.content"
+            }
+        },
+        {
+            "name": "q.m3.publish.retry",
+            "vhost": "/",
+            "durable": true,
+            "auto_delete": false,
+            "arguments": {
+                "x-message-ttl": 30000,
+                "x-dead-letter-exchange": "",
+                "x-dead-letter-routing-key": "q.m3.publish"
+            }
+        },
+        {
+            "name": "q.m4.experience.retry",
+            "vhost": "/",
+            "durable": true,
+            "auto_delete": false,
+            "arguments": {
+                "x-message-ttl": 30000,
+                "x-dead-letter-exchange": "",
+                "x-dead-letter-routing-key": "q.m4.experience"
+            }
+        },
+        {
+            "name": "q.m2.event_store.retry",
+            "vhost": "/",
+            "durable": true,
+            "auto_delete": false,
+            "arguments": {
+                "x-message-ttl": 30000,
+                "x-dead-letter-exchange": "",
+                "x-dead-letter-routing-key": "q.m2.event_store"
+            }
+        },
+        {
+            "name": "q.m1.content.dlq",
+            "vhost": "/",
+            "durable": true,
+            "auto_delete": false,
+            "arguments": {}
+        },
+        {
+            "name": "q.m3.publish.dlq",
+            "vhost": "/",
+            "durable": true,
+            "auto_delete": false,
+            "arguments": {}
+        },
+        {
+            "name": "q.m4.experience.dlq",
+            "vhost": "/",
+            "durable": true,
+            "auto_delete": false,
+            "arguments": {}
+        },
+        {
+            "name": "q.m2.event_store.dlq",
             "vhost": "/",
             "durable": true,
             "auto_delete": false,
@@ -117,6 +219,70 @@
             "destination": "q.m2.event_store",
             "destination_type": "queue",
             "routing_key": "#",
+            "arguments": {}
+        },
+        {
+            "source": "pubtube.events.retry",
+            "vhost": "/",
+            "destination": "q.m1.content.retry",
+            "destination_type": "queue",
+            "routing_key": "q.m1.content",
+            "arguments": {}
+        },
+        {
+            "source": "pubtube.events.retry",
+            "vhost": "/",
+            "destination": "q.m3.publish.retry",
+            "destination_type": "queue",
+            "routing_key": "q.m3.publish",
+            "arguments": {}
+        },
+        {
+            "source": "pubtube.events.retry",
+            "vhost": "/",
+            "destination": "q.m4.experience.retry",
+            "destination_type": "queue",
+            "routing_key": "q.m4.experience",
+            "arguments": {}
+        },
+        {
+            "source": "pubtube.events.retry",
+            "vhost": "/",
+            "destination": "q.m2.event_store.retry",
+            "destination_type": "queue",
+            "routing_key": "q.m2.event_store",
+            "arguments": {}
+        },
+        {
+            "source": "pubtube.events.dlq",
+            "vhost": "/",
+            "destination": "q.m1.content.dlq",
+            "destination_type": "queue",
+            "routing_key": "q.m1.content",
+            "arguments": {}
+        },
+        {
+            "source": "pubtube.events.dlq",
+            "vhost": "/",
+            "destination": "q.m3.publish.dlq",
+            "destination_type": "queue",
+            "routing_key": "q.m3.publish",
+            "arguments": {}
+        },
+        {
+            "source": "pubtube.events.dlq",
+            "vhost": "/",
+            "destination": "q.m4.experience.dlq",
+            "destination_type": "queue",
+            "routing_key": "q.m4.experience",
+            "arguments": {}
+        },
+        {
+            "source": "pubtube.events.dlq",
+            "vhost": "/",
+            "destination": "q.m2.event_store.dlq",
+            "destination_type": "queue",
+            "routing_key": "q.m2.event_store",
             "arguments": {}
         }
     ]

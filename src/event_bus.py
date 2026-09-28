@@ -26,10 +26,19 @@ from pydantic import ValidationError
 
 from config import RABBITMQ_HOST, RABBITMQ_PORT, RABBITMQ_USER, RABBITMQ_PASS
 from envelope import EventEnvelope
+from reliability import (
+    DLQ_EXCHANGE,
+    EXCHANGE_NAME as RELIABILITY_EXCHANGE_NAME,
+    RETRY_MAX_BACKOFF_MS,
+    RETRY_EXCHANGE,
+    dlq_name,
+    retry_queue_name,
+    route_failed_message,
+)
 
 # ─── Constantes de configuración ─────────────────────────────────────────────
 
-EXCHANGE_NAME = "pubtube.events"
+EXCHANGE_NAME = RELIABILITY_EXCHANGE_NAME
 EXCHANGE_TYPE = "topic"
 
 # Número máximo de reintentos antes de rendirse
@@ -250,7 +259,34 @@ def subscribe_events(
             channel = conn.channel()
 
             # Declaramos la cola idempotentemente (si ya existe, no hace nada)
-            channel.queue_declare(queue=queue, durable=True)
+            channel.queue_declare(
+                queue=queue,
+                durable=True,
+                arguments={
+                    "x-dead-letter-exchange": RETRY_EXCHANGE,
+                    "x-dead-letter-routing-key": queue,
+                },
+            )
+            channel.queue_declare(
+                queue=retry_queue_name(queue),
+                durable=True,
+                arguments={
+                    "x-message-ttl": RETRY_MAX_BACKOFF_MS,
+                    "x-dead-letter-exchange": "",
+                    "x-dead-letter-routing-key": queue,
+                },
+            )
+            channel.queue_bind(
+                exchange=RETRY_EXCHANGE,
+                queue=retry_queue_name(queue),
+                routing_key=queue,
+            )
+            channel.queue_declare(queue=dlq_name(queue), durable=True)
+            channel.queue_bind(
+                exchange=DLQ_EXCHANGE,
+                queue=dlq_name(queue),
+                routing_key=queue,
+            )
 
             # Vinculamos cada routing key a la cola
             channel.exchange_declare(
@@ -258,6 +294,8 @@ def subscribe_events(
                 exchange_type=EXCHANGE_TYPE,
                 durable=True,
             )
+            channel.exchange_declare(exchange=RETRY_EXCHANGE, exchange_type="direct", durable=True)
+            channel.exchange_declare(exchange=DLQ_EXCHANGE, exchange_type="direct", durable=True)
             for rk in routing_keys:
                 channel.queue_bind(
                     exchange=EXCHANGE_NAME,
@@ -286,7 +324,9 @@ def subscribe_events(
                         "Mensaje inválido descartado (routing_key=%s): %s",
                         method.routing_key, exc,
                     )
-                    ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
+                    route_failed_message(
+                        ch, queue, method, properties, body, exc
+                    )
                     return
 
                 logger.info(
@@ -294,7 +334,11 @@ def subscribe_events(
                     envelope.type, envelope.id,
                 )
                 # Pasamos el canal para que el callback haga ACK manual si auto_ack=False
-                on_event(envelope, ch)
+                try:
+                    on_event(envelope, ch)
+                except Exception as exc:
+                    route_failed_message(ch, queue, method, properties, body, exc)
+                    return
 
                 if auto_ack:
                     ch.basic_ack(delivery_tag=method.delivery_tag)
