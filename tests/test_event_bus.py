@@ -30,6 +30,7 @@ from event_bus import (
     INITIAL_BACKOFF,
 )
 from envelope import EventEnvelope
+from reliability import DLQ_EXCHANGE, RETRY_EXCHANGE, route_failed_message
 
 
 # ─── Fixtures reutilizables ───────────────────────────────────────────────────
@@ -216,8 +217,13 @@ class TestSubscribeEvents:
         )
 
         # Verificar que se declaró la cola
-        mock_ch.queue_declare.assert_called_with(
-            queue="q.m4.experience", durable=True
+        assert mock_ch.queue_declare.call_args_list[0] == call(
+            queue="q.m4.experience",
+            durable=True,
+            arguments={
+                "x-dead-letter-exchange": "pubtube.events.retry",
+                "x-dead-letter-routing-key": "q.m4.experience",
+            },
         )
 
         # Verificar que se vincularon TODAS las routing keys
@@ -313,10 +319,36 @@ class TestSubscribeEvents:
             on_event=my_handler,
         )
 
-        # El mensaje inválido fue descartado con NACK
-        mock_ch.basic_nack.assert_called_once_with(delivery_tag=1, requeue=False)
+        # El mensaje inválido se conserva en la DLQ y se confirma el original.
+        mock_ch.basic_publish.assert_called_once()
+        assert mock_ch.basic_publish.call_args.kwargs["exchange"] == RETRY_EXCHANGE
+        mock_ch.basic_ack.assert_called_once_with(delivery_tag=1)
         # Ningún mensaje válido llegó al handler
         assert len(mensajes_validos_recibidos) == 0
+
+    def test_fallo_aplica_backoff_exponencial(self):
+        channel = MagicMock()
+        method = MagicMock(delivery_tag=7)
+        properties = MagicMock(headers={"x-death": []})
+
+        route_failed_message(channel, "q.m4.experience", method, properties, b"event", RuntimeError("fallo"))
+
+        assert channel.basic_publish.call_args.kwargs["exchange"] == RETRY_EXCHANGE
+        assert channel.basic_publish.call_args.kwargs["properties"].expiration == "1000"
+        channel.basic_ack.assert_called_once_with(delivery_tag=7)
+
+    def test_tercer_fallo_termina_en_dlq(self):
+        channel = MagicMock()
+        method = MagicMock(delivery_tag=8)
+        properties = MagicMock(headers={"x-death": [{"queue": "q.m4.experience", "count": 2}]})
+
+        exhausted = route_failed_message(
+            channel, "q.m4.experience", method, properties, b"event", RuntimeError("fallo")
+        )
+
+        assert exhausted is True
+        assert channel.basic_publish.call_args.kwargs["exchange"] == DLQ_EXCHANGE
+        channel.basic_ack.assert_called_once_with(delivery_tag=8)
 
     @patch("event_bus.time.sleep")
     @patch("event_bus.pika.BlockingConnection")
