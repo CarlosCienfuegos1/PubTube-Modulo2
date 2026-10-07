@@ -7,5 +7,5 @@ RUN pip install --no-cache-dir -r requirements.txt uvicorn
 
 COPY src/ ./src/
 
-ENV PYTHONPATH=/app
-CMD ["sh", "-c", "uvicorn src.api:app --host 0.0.0.0 --port ${PORT:-8000}"]
+ENV PYTHONPATH=/app/src
+CMD ["sh", "-c", "uvicorn api:app --host 0.0.0.0 --port ${PORT:-8000}"]
