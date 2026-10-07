@@ -6,6 +6,13 @@ from traceability import get_traceability_by_correlation_id
 
 app = FastAPI(title="PubTube Traceability API")
 
+@app.get("/health")
+@app.get("/api/events/health")
+@app.get("/events/health")
+def health_check():
+    return {"status": "ok"}
+
+
 
 @app.get(
     "/events/{correlation_id}",

@@ -1,0 +1,187 @@
+name: Module and Gateway integration example
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  gateway-integration:
+    name: Build module and smoke-test through Gateway
+    runs-on: ubuntu-latest
+    env:
+      MODULE_SLOT: ${{ vars.MODULE_SLOT || '2' }}
+      MODULE_PORT: ${{ vars.MODULE_PORT || '8000' }}
+      GATEWAY_SMOKE_PATH: ${{ vars.GATEWAY_SMOKE_PATH || '' }}
+      JWT_SECRET: module-ci-only-secret-change-this-value
+    steps:
+      - name: Checkout module
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+
+      - name: Run Tests
+        run: |
+          docker compose up -d
+          pip install -r requirements.txt pytest httpx
+          python -m pytest tests/ -v
+          docker compose down
+
+      - name: Validate module integration settings
+        id: settings
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$MODULE_SLOT" =~ ^[123]$ ]]; then
+            printf 'MODULE_SLOT must be 1, 2, or 3.\n' >&2
+            exit 1
+          fi
+          if [[ ! "$MODULE_PORT" =~ ^[0-9]+$ ]] || (( MODULE_PORT < 1 || MODULE_PORT > 65535 )); then
+            printf 'MODULE_PORT must be between 1 and 65535.\n' >&2
+            exit 1
+          fi
+          smoke_path="$GATEWAY_SMOKE_PATH"
+          case "$MODULE_SLOT" in
+            1) health_smoke_path=/api/content/health ;;
+            2) health_smoke_path=/api/events/health ;;
+            3) health_smoke_path=/api/publish/health ;;
+          esac
+          if [[ -z "$smoke_path" ]]; then
+            smoke_path="$health_smoke_path"
+          fi
+          if [[ ! "$smoke_path" =~ ^/[A-Za-z0-9._~/%-]+$ ]]; then
+            printf 'GATEWAY_SMOKE_PATH must be an absolute URL path.\n' >&2
+            exit 1
+          fi
+          printf 'smoke_path=%s\n' "$smoke_path" >> "$GITHUB_OUTPUT"
+          printf 'health_smoke_path=%s\n' "$health_smoke_path" >> "$GITHUB_OUTPUT"
+
+      - name: Build module image
+        run: |
+          docker build \
+            --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
+            --tag pubtube-module-under-test:ci .
+
+      - name: Pull Gateway image
+        run: docker pull ghcr.io/tilininsano312/pubtube-mod4:develop
+
+      - name: Create integration network
+        run: docker network create module-gateway-integration
+
+      - name: Start module container
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Adjust PORT and add the module's required environment variables here.
+          docker run --detach \
+            --name module-under-test \
+            --network module-gateway-integration \
+            --network-alias module-under-test \
+            --env "PORT=$MODULE_PORT" \
+            --env "RABBITMQ_USER=ci" \
+            --env "RABBITMQ_PASS=ci" \
+            --env "POSTGRES_USER=ci" \
+            --env "POSTGRES_PASSWORD=ci" \
+            --env "POSTGRES_DB=ci" \
+            pubtube-module-under-test:ci
+
+      - name: Start Gateway container
+        shell: bash
+        run: |
+          set -euo pipefail
+          gateway_env=(
+            --env GATEWAY_PORT=8000
+            --env "JWT_SECRET=$JWT_SECRET"
+            --env JWT_ALGORITHM=HS256
+          )
+          gateway_env+=(--env "MODULE${MODULE_SLOT}_URL=http://module-under-test:$MODULE_PORT")
+
+          docker run --detach \
+            --name gateway-under-test \
+            --network module-gateway-integration \
+            --publish 8000:8000 \
+            "${gateway_env[@]}" \
+            ghcr.io/tilininsano312/pubtube-mod4:develop
+
+      - name: Wait for module and Gateway health
+        env:
+          GATEWAY_SMOKE_PATH: ${{ steps.settings.outputs.smoke_path }}
+          GATEWAY_HEALTH_SMOKE_PATH: ${{ steps.settings.outputs.health_smoke_path }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --retry 30 --retry-connrefused --retry-delay 2 --retry-max-time 90 \
+            --fail --silent --show-error \
+            http://127.0.0.1:8000/api/health --output /dev/null
+
+          token="$(docker exec gateway-under-test python -c \
+            'import os,time,jwt; print(jwt.encode({"sub":"module-ci","user_id":"module-ci","role":"admin","exp":int(time.time())+300}, os.environ["JWT_SECRET"], algorithm="HS256"))')"
+          healthy=false
+          for attempt in $(seq 1 45); do
+            if curl --fail --silent \
+              --header "Authorization: Bearer $token" \
+              --header "X-Correlation-Id: module-ci-${GITHUB_RUN_ID}" \
+              "http://127.0.0.1:8000$GATEWAY_HEALTH_SMOKE_PATH" --output /dev/null 2>/dev/null; then
+              healthy=true
+              break
+            fi
+            sleep 2
+          done
+          if [[ "$healthy" != true ]]; then
+            printf 'Module health check did not succeed through the Gateway.\n' >&2
+            exit 1
+          fi
+
+          curl --fail --silent --show-error \
+            --header "Authorization: Bearer $token" \
+            --header "X-Correlation-Id: module-ci-${GITHUB_RUN_ID}" \
+            "http://127.0.0.1:8000$GATEWAY_SMOKE_PATH" --output /dev/null
+
+      - name: Log in to GHCR
+        if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up QEMU
+        if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Publish module image
+        if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+        shell: bash
+        run: |
+          set -euo pipefail
+          image="ghcr.io/${GITHUB_REPOSITORY,,}:develop"
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
+            --tag "$image" \
+            --push .
+
+      - name: Show containers and logs on failure
+        if: failure()
+        run: |
+          docker ps -a || true
+          docker logs module-under-test || true
+          docker logs gateway-under-test || true
+
+      - name: Clean up integration containers
+        if: always()
+        run: |
+          docker rm --force module-under-test gateway-under-test || true
+          docker network rm module-gateway-integration || true
