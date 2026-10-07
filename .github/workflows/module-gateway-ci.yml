@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       MODULE_SLOT: ${{ vars.MODULE_SLOT || '2' }}
-      MODULE_PORT: ${{ vars.MODULE_PORT || '8000' }}
+      MODULE_PORT: ${{ vars.MODULE_PORT || '8002' }}
       GATEWAY_SMOKE_PATH: ${{ vars.GATEWAY_SMOKE_PATH || '' }}
       JWT_SECRET: module-ci-only-secret-change-this-value
     steps:
