@@ -20,11 +20,18 @@ import uuid
 import threading
 import concurrent.futures
 from typing import Optional, cast
+from unittest.mock import MagicMock
 
 import psycopg
 import pytest
 
-from idempotency import init_idempotency_db, try_register_event
+from envelope import EventEnvelope
+from idempotency import (
+    init_idempotency_db,
+    try_register_event,
+    make_idempotent_middleware,
+    idempotent_handler,
+)
 
 
 # ─── Fixture de conexion ──────────────────────────────────────────────────────
@@ -51,6 +58,7 @@ def db_ready():
             dbname=POSTGRES_DB,
             user=POSTGRES_USER,
             password=POSTGRES_PASSWORD,
+            connect_timeout=2,
         )
         conn.close()
     except psycopg.OperationalError:
@@ -75,6 +83,7 @@ def limpiar_tabla(db_ready):
         dbname=POSTGRES_DB,
         user=POSTGRES_USER,
         password=POSTGRES_PASSWORD,
+        connect_timeout=2,
     )
     with conn.cursor() as cur:
         cur.execute("TRUNCATE TABLE processed_events;")
@@ -96,6 +105,7 @@ def _contar_registros(event_id: str, consumer_id: str) -> int:
         dbname=POSTGRES_DB,
         user=POSTGRES_USER,
         password=POSTGRES_PASSWORD,
+        connect_timeout=2,
     )
     with conn.cursor() as cur:
         cur.execute(
@@ -310,3 +320,97 @@ class TestConcurrenciaReal:
         assert total == 1, (
             f"Se esperaba 1 fila en BD, se encontraron {total}"
         )
+
+
+# ─── Pruebas de integracion del Middleware con reentrega forzada ─────────────
+
+class TestMiddlewareIntegracionReentrega:
+    """
+    Pruebas de integracion del middleware transparente (Opción 2) con PostgreSQL real:
+    Verifica los criterios de aceptación centrales de US-B4:
+      - 'Reentregar un evento no produce efectos duplicados'
+      - 'Se registra la clave de idempotencia de cada evento procesado'
+    """
+
+    def test_reentrega_forzada_no_produce_efectos_duplicados(self):
+        """
+        Al reentregar forzadamente el mismo evento:
+        1. Primera entrega: ejecuta el handler de negocio, registra en BD y hace ACK.
+        2. Segunda entrega: OMITE el handler de negocio y hace ACK directo a RabbitMQ.
+        """
+        event_id = str(uuid.uuid4())
+        consumer_id = "q.m4.experience"
+        ejecuciones = []
+
+        def mi_handler(envelope):
+            ejecuciones.append(envelope.id)
+
+        wrapped = make_idempotent_middleware(consumer_id, mi_handler)
+
+        envelope = EventEnvelope(
+            type="m1.video.uploaded",
+            correlationId="saga-integ-001",
+            payload={"contentId": "video_123"},
+        )
+        object.__setattr__(envelope, "id", event_id)
+
+        channel = MagicMock()
+        method_1 = MagicMock()
+        method_1.delivery_tag = 101
+
+        # ── Entrega 1: Evento nuevo ──
+        wrapped(envelope, channel, method_1)
+
+        assert len(ejecuciones) == 1
+        assert ejecuciones[0] == event_id
+        assert _contar_registros(event_id, consumer_id) == 1
+        channel.basic_ack.assert_called_once_with(delivery_tag=101)
+
+        # ── Entrega 2: Reentrega forzada del mismo evento ──
+        channel.reset_mock()
+        method_2 = MagicMock()
+        method_2.delivery_tag = 102
+
+        wrapped(envelope, channel, method_2)
+
+        # Criterio clave: NO se ejecutó el handler por segunda vez
+        assert len(ejecuciones) == 1
+        # Se envió ACK directo a RabbitMQ para evitar reencolar
+        channel.basic_ack.assert_called_once_with(delivery_tag=102)
+        # La BD sigue teniendo exactamente 1 registro
+        assert _contar_registros(event_id, consumer_id) == 1
+
+    def test_reentrega_forzada_con_decorador_idempotent_handler(self):
+        """
+        Verifica el mismo comportamiento usando @idempotent_handler con PostgreSQL real.
+        """
+        event_id = str(uuid.uuid4())
+        consumer_id = "q.m3.publish"
+        contador = 0
+
+        @idempotent_handler(consumer_id)
+        def mi_handler(envelope):
+            nonlocal contador
+            contador += 1
+
+        envelope = EventEnvelope(
+            type="m1.video.uploaded",
+            correlationId="saga-integ-002",
+            payload={"contentId": "video_456"},
+        )
+        object.__setattr__(envelope, "id", event_id)
+
+        channel = MagicMock()
+        method = MagicMock()
+        method.delivery_tag = 200
+
+        # Entrega 1
+        mi_handler(envelope, channel, method)
+        assert contador == 1
+        assert _contar_registros(event_id, consumer_id) == 1
+
+        # Entrega 2 (reentrega forzada)
+        mi_handler(envelope, channel, method)
+        assert contador == 1  # No subió el contador!
+        assert _contar_registros(event_id, consumer_id) == 1
+

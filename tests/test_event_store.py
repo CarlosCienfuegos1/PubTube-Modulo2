@@ -25,6 +25,7 @@ def db_connection():
         conn = psycopg.connect(
             host=POSTGRES_HOST, port=POSTGRES_PORT, dbname=POSTGRES_DB,
             user=POSTGRES_USER, password=POSTGRES_PASSWORD,
+            connect_timeout=2,
         )
     except psycopg.OperationalError:
         pytest.skip("PostgreSQL no está disponible (¿corriste 'docker compose up -d'?)")

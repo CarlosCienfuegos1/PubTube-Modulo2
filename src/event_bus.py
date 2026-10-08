@@ -16,6 +16,7 @@ que si el broker RabbitMQ está caído, el cliente esperará 1s, 2s, 4s... antes
 reintentar, evitando saturar la red con reintentos agresivos.
 """
 
+import inspect
 import time
 import logging
 from typing import Any, Callable, Dict, List, Optional
@@ -214,13 +215,20 @@ def publish_event(
 def subscribe_events(
     queue: str,
     routing_keys: List[str],
-    on_event: Callable[[EventEnvelope, Any], None],
+    on_event: Callable[..., None],
     auto_ack: bool = False,
+    idempotent: bool = True,
 ) -> None:
     """
     Suscribe a una o más routing keys y comienza a consumir eventos de forma
     indefinida. Si el broker cae, reconecta automáticamente con retroceso
     exponencial y retoma el consumo.
+
+    El desarrollador que usa esta función solo necesita escribir una función
+    limpia que reciba el EventEnvelope. El SDK se ocupa internamente de:
+      - El ACK/NACK a RabbitMQ.
+      - La consulta a la tabla `processed_events` para filtrar duplicados.
+      - La reconexión automática al broker.
 
     Args:
         queue:        Nombre de la cola durable a consumir (ej: 'q.m4.experience').
@@ -228,31 +236,62 @@ def subscribe_events(
                       o se declarará idempotentemente en la primera conexión.
         routing_keys: Lista de routing keys a vincular a la cola, ej:
                       ['m1.video.uploaded', 'm3.publish.completed'].
-        on_event:     Función callback que se llama por cada evento recibido.
-                      Firma: on_event(envelope: EventEnvelope, channel: Any) -> None.
-                      El canal se pasa para que el callback pueda hacer ACK manual.
-        auto_ack:     Si True, el broker marca el mensaje como procesado apenas lo
-                      entrega (at-most-once). Si False (default), el callback debe
-                      hacer ch.basic_ack(method.delivery_tag) manualmente
-                      (at-least-once, más seguro en producción).
+        on_event:     Función callback del usuario. Soporta dos firmas:
+
+                      Firma simple (recomendada — Opción 2: el SDK gestiona todo):
+                          on_event(envelope: EventEnvelope) -> None
+
+                      Firma extendida (para control manual):
+                          on_event(envelope, channel) -> None
+                          on_event(envelope, channel, method) -> None
+
+        auto_ack:     Si True, RabbitMQ marca el mensaje como procesado apenas lo
+                      entrega (desactiva el middleware de idempotencia).
+        idempotent:   Si True (por defecto), el SDK envuelve automáticamente
+                      `on_event` con el middleware de idempotencia (Opción 2):
+                      consulta `processed_events`, filtra duplicados y gestiona
+                      el ACK/NACK. Requiere PostgreSQL disponible.
+                      Si False, el callback gestiona su propio flujo o usa auto_ack.
 
     Raises:
         Exception: propaga cualquier excepción no recuperable del callback.
 
-    Ejemplo de uso:
+    Ejemplo de uso básico (Opción 2 — idempotencia automática recomendada):
         from event_bus import subscribe_events
-        from envelope import EventEnvelope
 
-        def manejar_video(envelope: EventEnvelope, channel) -> None:
+        def procesar_video(envelope):
+            # Firma limpia: solo el sobre del evento.
+            # El SDK garantiza que esta función se ejecuta exactamente una vez
+            # por evento, aunque RabbitMQ reentregue el mensaje.
             print(f"Video subido: {envelope.payload['contentId']}")
-            channel.basic_ack(delivery_tag=???)  # viene del method_frame
 
         subscribe_events(
             queue="q.m4.experience",
             routing_keys=["m1.video.uploaded", "m3.publish.completed"],
-            on_event=manejar_video,
+            on_event=procesar_video,
+            # idempotent=True  ← es el valor por defecto, se puede omitir
         )
     """
+    # ── Determinar número de parámetros del callback ──────────────────────────
+    try:
+        _n_params = len(inspect.signature(on_event).parameters)
+    except (ValueError, TypeError):
+        _n_params = 1
+
+    # ── Aplicar el middleware de idempotencia si está habilitado ──────────────
+    _middleware_callback: Optional[Callable[..., None]] = None
+    if idempotent and not auto_ack:
+        from idempotency import make_idempotent_middleware
+        try:
+            from idempotency import init_idempotency_db
+            init_idempotency_db()
+        except Exception as exc:
+            logger.debug(
+                "[idempotency] init_idempotency_db no pudo conectar a PostgreSQL: %s",
+                exc,
+            )
+        _middleware_callback = make_idempotent_middleware(queue, on_event)
+
     while True:
         try:
             conn = _connect_with_retry()
@@ -313,7 +352,8 @@ def subscribe_events(
                 """
                 Callback interno que intercepta cada mensaje raw de pika,
                 lo deserializa y valida como EventEnvelope, y llama al
-                callback del usuario (on_event).
+                callback del usuario (on_event) ya posiblemente envuelto
+                por el middleware de idempotencia.
                 """
                 try:
                     envelope = EventEnvelope.deserialize(body.decode("utf-8"))
@@ -333,15 +373,26 @@ def subscribe_events(
                     "Evento recibido: type='%s', id='%s'",
                     envelope.type, envelope.id,
                 )
-                # Pasamos el canal para que el callback haga ACK manual si auto_ack=False
-                try:
-                    on_event(envelope, ch)
-                except Exception as exc:
-                    route_failed_message(ch, queue, method, properties, body, exc)
-                    return
+                if _middleware_callback is not None:
+                    # Opción 2: Middleware transparente gestiona filtrado de duplicados,
+                    # ejecución del handler y ACK/NACK automáticamente.
+                    _middleware_callback(envelope, ch, method)
+                else:
+                    # Modo directo (auto_ack=True o idempotent=False)
+                    try:
+                        if _n_params == 1:
+                            on_event(envelope)
+                        elif _n_params == 2:
+                            on_event(envelope, ch)
+                        else:
+                            on_event(envelope, ch, method)
+                    except Exception as exc:
+                        # US-B3: Si falla en modo directo, enruta a la cola de reintentos o DLQ
+                        route_failed_message(ch, queue, method, properties, body, exc)
+                        return
 
-                if auto_ack:
-                    ch.basic_ack(delivery_tag=method.delivery_tag)
+                    if auto_ack:
+                        ch.basic_ack(delivery_tag=method.delivery_tag)
 
             channel.basic_consume(
                 queue=queue,
