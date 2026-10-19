@@ -1,0 +1,53 @@
+{
+  "properties": {
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "type": {
+      "title": "Type",
+      "type": "string"
+    },
+    "version": {
+      "default": 1,
+      "title": "Version",
+      "type": "integer"
+    },
+    "timestamp": {
+      "title": "Timestamp",
+      "type": "string"
+    },
+    "correlationId": {
+      "title": "Correlationid",
+      "type": "string"
+    },
+    "causationId": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Causationid"
+    },
+    "source": {
+      "default": "module-2",
+      "title": "Source",
+      "type": "string"
+    },
+    "payload": {
+      "additionalProperties": true,
+      "title": "Payload",
+      "type": "object"
+    }
+  },
+  "required": [
+    "type",
+    "correlationId"
+  ],
+  "title": "EventEnvelope",
+  "type": "object"
+}

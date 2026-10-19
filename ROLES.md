@@ -19,8 +19,8 @@ Para garantizar el aprendizaje integral de todos los integrantes, los roles rota
   2. [Eduardo Krause]
   3. [Ignacio Manriquez]
 
-## Sprint 1
 
+## Sprint 1
 - Product Owner: [Adolfo Gayoso]
 - Scrum Master: [Angel Rocha]
 - Equipo de Desarrollo: 
@@ -36,7 +36,6 @@ Para garantizar el aprendizaje integral de todos los integrantes, los roles rota
   1. [Adolfo Gayoso]
   2. [Angel Rocha]
   3. [Ignacio Manriquez]
-
 
 
 ## Sprint 3

@@ -1,52 +1,56 @@
-import pika
-import os
-from dotenv import load_dotenv
+"""
+demo_subscriber.py — Ejemplo de suscripción usando el SDK event_bus (US-B1b).
 
-load_dotenv()
+Muestra cómo cualquier módulo (M1, M3, M4...) se suscribe a eventos del exchange
+'pubtube.events' usando la librería interna con reconexión automática.
 
-# Fail-fast: si falta alguna variable, el script debe fallar explícitamente
-# en vez de conectarse silenciosamente con credenciales por defecto.
-RABBITMQ_HOST = os.environ["RABBITMQ_HOST"]
-RABBITMQ_PORT = int(os.environ["RABBITMQ_PORT"])
-RABBITMQ_USER = os.environ["RABBITMQ_USER"]
-RABBITMQ_PASS = os.environ["RABBITMQ_PASS"]
+Uso:
+    python src/demo_subscriber.py
+"""
+import logging
+from event_bus import subscribe_events
+from envelope import EventEnvelope
 
-
-def callback(ch, method, properties, body):
-    print(f"\n[x] Evento recibido (Routing Key: {method.routing_key})")
-    print(f"    Payload raw: {body.decode()}")
-    print("    - Listo para ser deserializado y procesado -")
-
-    # Ack manual: solo confirmamos el mensaje después de procesarlo con éxito.
-    # Con auto_ack=True, RabbitMQ da el mensaje por entregado apenas lo envía,
-    # y si el consumidor se cae antes de terminar de procesarlo, el mensaje
-    # se pierde. Esto viola la garantía "at-least-once" que pide el proyecto.
-    ch.basic_ack(delivery_tag=method.delivery_tag)
+logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
 
-def consume_events():
-    credentials = pika.PlainCredentials(RABBITMQ_USER, RABBITMQ_PASS)
-    parameters = pika.ConnectionParameters(host=RABBITMQ_HOST, port=RABBITMQ_PORT, credentials=credentials)
+def on_event(envelope: EventEnvelope, channel) -> None:
+    """
+    Callback que se llama por cada evento recibido en la cola.
 
-    connection = pika.BlockingConnection(parameters)
-    channel = connection.channel()
-    queue_name = 'test_queue'
-    print(f"[*] Esperando eventos en '{queue_name}'. Presiona CTRL+C para salir.")
+    Args:
+        envelope: El evento ya deserializado y validado como EventEnvelope.
+        channel:  El canal pika activo. Úsalo para hacer ACK manual.
+    """
+    print(f"\n[x] Evento recibido: type='{envelope.type}'")
+    print(f"    id:            {envelope.id}")
+    print(f"    correlationId: {envelope.correlationId}")
+    print(f"    payload:       {envelope.payload}")
+    print("    - Procesado exitosamente -")
 
-    channel.basic_consume(
-        queue=queue_name,
-        on_message_callback=callback,
-        auto_ack=False  # ack manual, ver callback()
+    # ACK manual: le confirma al broker que procesamos el mensaje con éxito.
+    # Si el proceso muere antes de llegar aquí, RabbitMQ reencola el mensaje.
+    channel.basic_ack(delivery_tag=channel.last_delivery_tag if hasattr(channel, 'last_delivery_tag') else 0)
+
+
+def _on_event_with_method(envelope: EventEnvelope, channel) -> None:
+    """Wrapper que imprime el evento. El channel aquí es el canal pika."""
+    print(f"\n[x] Evento recibido: type='{envelope.type}'")
+    print(f"    id:            {envelope.id}")
+    print(f"    correlationId: {envelope.correlationId}")
+    print(f"    payload:       {envelope.payload}")
+    print("    - Listo para ser procesado -")
+
+
+def main() -> None:
+    print("[*] Esperando eventos en 'q.m4.experience'. Presiona Ctrl+C para salir.")
+    subscribe_events(
+        queue="q.m4.experience",
+        routing_keys=["m1.video.uploaded", "m3.publish.completed"],
+        on_event=_on_event_with_method,
+        auto_ack=True,  # auto_ack=True para el demo; en producción usar False + ACK manual
     )
-
-    try:
-        channel.start_consuming()
-    except KeyboardInterrupt:
-        print("\nSaliendo...")
-        channel.stop_consuming()
-
-    connection.close()
 
 
 if __name__ == "__main__":
-    consume_events()
+    main()
