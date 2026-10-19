@@ -54,4 +54,3 @@ Para garantizar el aprendizaje integral de todos los integrantes, los roles rota
   1. [Carlos Cienfuegos]
   2. [Eduardo Krause]
   3. [Adolfo Gayoso]
-
