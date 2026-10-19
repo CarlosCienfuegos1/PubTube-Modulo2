@@ -37,3 +37,17 @@ class EventEnvelope(BaseModel):
         """Deserializa y valida un string JSON convirtiéndolo en un EventEnvelope.
         Lanza ValidationError si el JSON no cumple con el esquema."""
         return cls.model_validate_json(json_str)
+
+    @classmethod
+    def create_child_from(cls, parent_event: 'EventEnvelope', event_type: str, payload: Dict[str, Any] = None) -> 'EventEnvelope':
+        """
+        Crea un nuevo evento como consecuencia de otro (propagación).
+        - Conserva el mismo correlationId para trazar el flujo completo.
+        - Asigna el id del evento padre como causationId de este nuevo evento.
+        """
+        return cls(
+            type=event_type,
+            correlationId=parent_event.correlationId,
+            causationId=parent_event.id,
+            payload=payload or {}
+        )
