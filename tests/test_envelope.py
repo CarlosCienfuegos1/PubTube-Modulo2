@@ -41,13 +41,13 @@ def test_envelope_causationId_es_opcional():
 def test_envelope_requiere_type():
     """'type' es obligatorio: sin él, la validación debe fallar."""
     with pytest.raises(ValidationError):
-        EventEnvelope(correlationId="abc-123")
+        EventEnvelope(correlationId="abc-123")  # type: ignore
 
 
 def test_envelope_requiere_correlationId():
     """'correlationId' es obligatorio: sin él, la validación debe fallar."""
     with pytest.raises(ValidationError):
-        EventEnvelope(type="video.uploaded")
+        EventEnvelope(type="video.uploaded")  # type: ignore
 
 
 def test_envelope_serializa_a_json_valido():
@@ -73,3 +73,32 @@ def test_envelope_acepta_payload_anidado():
     payload = {"contentId": "video_1", "meta": {"size": 123, "format": "mp4"}}
     evento = EventEnvelope(type="video.uploaded", correlationId="abc-123", payload=payload)
     assert evento.payload == payload
+
+def test_envelope_ignora_campos_nuevos_forward_compatibility():
+    """El campo version permite agregar campos nuevos sin romper consumidores existentes."""
+    json_futuro = '{"id": "1", "type": "test", "version": 2, "timestamp": "2026-01-01T00:00:00Z", "correlationId": "abc", "nuevo_campo_del_futuro": "hola", "payload": {}}'
+    # No debe arrojar ValidationError, simplemente lo descarta
+    evento = EventEnvelope.deserialize(json_futuro)
+    assert evento.version == 2
+    assert not hasattr(evento, "nuevo_campo_del_futuro")
+
+def test_envelope_propagacion_flujo_3_eventos():
+    """Prueba la propagación de correlationId y causationId en una cadena de 3 eventos (US-B2b)."""
+    # Evento 1: Origen (ej: usuario sube video)
+    evento1 = EventEnvelope(type="video.uploaded", correlationId="flujo-123")
+    
+    # Evento 2: Consecuencia del evento 1 (ej: video procesado)
+    evento2 = EventEnvelope.create_child_from(evento1, "video.processed")
+    
+    # Evento 3: Consecuencia del evento 2 (ej: notificación enviada)
+    evento3 = EventEnvelope.create_child_from(evento2, "notification.sent")
+    
+    # Verificaciones del flujo
+    assert evento1.correlationId == "flujo-123"
+    assert evento1.causationId is None
+    
+    assert evento2.correlationId == "flujo-123"
+    assert evento2.causationId == evento1.id
+    
+    assert evento3.correlationId == "flujo-123"
+    assert evento3.causationId == evento2.id

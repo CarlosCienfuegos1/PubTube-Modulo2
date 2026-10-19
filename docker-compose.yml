@@ -2,22 +2,45 @@ services:
   rabbitmq:
     image: rabbitmq:4-management
     container_name: pubtube-rabbitmq
-    env_file:
-      - .env
     ports:
       - "127.0.0.1:${RABBITMQ_PORT:-5672}:5672"
       - "127.0.0.1:15672:15672"
+    entrypoint: ["/bin/bash", "/usr/local/bin/entrypoint.sh"]
     environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS}
+      RABBITMQ_USER: ${RABBITMQ_USER:-admin}
+      RABBITMQ_PASS: ${RABBITMQ_PASS:-admin123}
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-admin}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-admin123}
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
+      - ./rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - ./rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro
+      - ./rabbitmq/entrypoint.sh:/usr/local/bin/entrypoint.sh:ro
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      test: [ "CMD", "rabbitmq-diagnostics", "-q", "ping" ]
       interval: 30s
       timeout: 10s
       retries: 5
     restart: unless-stopped
 
+  postgres:
+    image: postgres:16-alpine
+    container_name: pubtube-postgres
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pubtube}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pubtube}
+      POSTGRES_DB: ${POSTGRES_DB:-pubtube_events}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pubtube} -d ${POSTGRES_DB:-pubtube_events}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
 volumes:
   rabbitmq_data:
+  postgres_data:
