@@ -1,53 +1,48 @@
 {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pubtube.dev/schemas/event-envelope.v1.json",
+  "title": "PubTube Event Envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "type",
+    "version",
+    "timestamp",
+    "correlationId",
+    "causationId",
+    "payload"
+  ],
   "properties": {
     "id": {
-      "title": "Id",
-      "type": "string"
+      "type": "string",
+      "minLength": 1
     },
     "type": {
-      "title": "Type",
-      "type": "string"
+      "type": "string",
+      "minLength": 1
     },
     "version": {
-      "default": 1,
-      "title": "Version",
-      "type": "integer"
+      "type": "integer",
+      "const": 1
     },
     "timestamp": {
-      "title": "Timestamp",
-      "type": "string"
+      "type": "string",
+      "format": "date-time"
     },
     "correlationId": {
-      "title": "Correlationid",
-      "type": "string"
+      "type": "string",
+      "minLength": 1
     },
     "causationId": {
-      "anyOf": [
-        {
-          "type": "string"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null,
-      "title": "Causationid"
+      "type": ["string", "null"]
     },
     "source": {
-      "default": "module-2",
-      "title": "Source",
-      "type": "string"
+      "type": "string",
+      "minLength": 1
     },
     "payload": {
-      "additionalProperties": true,
-      "title": "Payload",
       "type": "object"
     }
-  },
-  "required": [
-    "type",
-    "correlationId"
-  ],
-  "title": "EventEnvelope",
-  "type": "object"
+  }
 }

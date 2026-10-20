@@ -1,0 +1,91 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "PubTube Module 2 Traceability API",
+    "version": "1.0.0",
+    "description": "Consulta del Event Store del núcleo Pub/Sub."
+  },
+  "paths": {
+    "/events": {
+      "get": {
+        "operationId": "query_events",
+        "parameters": [
+          {
+            "name": "correlationId",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "string"},
+            "description": "Filtra los eventos de un flujo."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Eventos encontrados.",
+            "content": {"application/json": {"schema": {"type": "array", "items": {"$ref": "#/components/schemas/EventRecord"}}}}
+          },
+          "500": {"$ref": "#/components/responses/InternalError"}
+        }
+      }
+    },
+    "/events/{correlationId}": {
+      "get": {
+        "operationId": "query_traceability",
+        "parameters": [
+          {
+            "name": "correlationId",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string", "minLength": 1}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Eventos encontrados.",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/TraceabilityResponse"}}}
+          },
+          "400": {"$ref": "#/components/responses/BadRequest"},
+          "404": {"$ref": "#/components/responses/NotFound"},
+          "500": {"$ref": "#/components/responses/InternalError"}
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "EventRecord": {
+        "type": "object",
+        "required": ["id", "type", "version", "timestamp", "correlation_id", "payload"],
+        "properties": {
+          "id": {"type": "string"},
+          "type": {"type": "string"},
+          "version": {"type": "integer", "const": 1},
+          "timestamp": {"type": "string", "format": "date-time"},
+          "correlation_id": {"type": "string"},
+          "causation_id": {"type": ["string", "null"]},
+          "source": {"type": "string"},
+          "routing_key": {"type": "string"},
+          "payload": {"type": "object"},
+          "received_at": {"type": "string", "format": "date-time"}
+        }
+      },
+      "TraceabilityResponse": {
+        "type": "object",
+        "required": ["correlationId", "events"],
+        "properties": {
+          "correlationId": {"type": "string"},
+          "events": {"type": "array", "items": {"$ref": "#/components/schemas/EventRecord"}}
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": ["detail"],
+        "properties": {"detail": {"type": "string"}}
+      }
+    },
+    "responses": {
+      "BadRequest": {"description": "Solicitud inválida.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+      "NotFound": {"description": "No se encontraron eventos.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+      "InternalError": {"description": "Error interno al consultar el Event Store.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+    }
+  }
+}

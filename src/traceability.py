@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from event_store import get_events_by_correlation_id
+from event_store import get_all_events, get_events_by_correlation_id
 
 
 def get_traceability_by_correlation_id(correlation_id: str) -> list[dict[str, Any]]:
@@ -11,3 +11,10 @@ def get_traceability_by_correlation_id(correlation_id: str) -> list[dict[str, An
         raise ValueError("'correlation_id' es obligatorio y no puede estar vacío.")
 
     return get_events_by_correlation_id(correlation_id.strip())
+
+
+def get_traceability(correlation_id: str | None = None) -> list[dict[str, Any]]:
+    """Devuelve todos los eventos o los filtra por correlationId."""
+    if correlation_id is None:
+        return get_all_events()
+    return get_traceability_by_correlation_id(correlation_id)

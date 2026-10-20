@@ -24,9 +24,11 @@ from typing import Any, Callable, Dict, List, Optional
 import pika
 import pika.exceptions
 from pydantic import ValidationError
+from jsonschema import ValidationError as JsonSchemaValidationError
 
 from config import RABBITMQ_HOST, RABBITMQ_PORT, RABBITMQ_USER, RABBITMQ_PASS
 from envelope import EventEnvelope
+from contract_validation import validate_event_contract
 from reliability import (
     DLQ_EXCHANGE,
     EXCHANGE_NAME as RELIABILITY_EXCHANGE_NAME,
@@ -185,6 +187,7 @@ def publish_event(
         source=source,
         payload=payload,
     )
+    validate_event_contract(envelope.model_dump(mode="json"))
     body = envelope.serialize()
 
     # _connect_with_retry ya maneja los reintentos de conexión con backoff.
@@ -357,7 +360,8 @@ def subscribe_events(
                 """
                 try:
                     envelope = EventEnvelope.deserialize(body.decode("utf-8"))
-                except (ValidationError, ValueError) as exc:
+                    validate_event_contract(envelope.model_dump(mode="json"))
+                except (ValidationError, JsonSchemaValidationError, ValueError) as exc:
                     # Si el mensaje no es un EventEnvelope válido, lo descartamos
                     # con NACK sin requeue para no bloquear la cola con basura.
                     logger.error(
