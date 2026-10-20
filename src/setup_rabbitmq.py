@@ -47,7 +47,21 @@ def setup():
             "m3.publish.failed",
             "m4.team.notified"
         ]),
-        ("q.m2.event_store", ["#"])
+        ("q.m2.event_store", ["#"]),
+        ("q.m2.saga", [
+            "m3.publish.scheduled",
+            "publish.scheduled",
+            "m3.publish.completed",
+            "publish.completed",
+            "m3.publish.failed",
+            "publish.failed",
+            "m4.team.notified",
+            "m4.notify.sent",
+            "notify.sent",
+            "m4.notify.failed",
+            "notify.failed",
+            "m4.team.notification.failed",
+        ])
     ]
 
     for queue_name, routing_keys in queues_bindings:
