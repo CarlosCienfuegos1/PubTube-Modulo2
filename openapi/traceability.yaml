@@ -1,0 +1,202 @@
+openapi: 3.0.3
+info:
+  title: PubTube Modulo 2 - Traceability API Contract
+  description: Contrato de interfaz OpenAPI para la consulta de eventos y trazabilidad histórica de sagas por correlationId.
+  version: 1.0.0
+paths:
+  /events/{correlation_id}:
+    get:
+      tags:
+        - Traceability
+      summary: Consultar eventos de una saga por correlationId
+      description: Recupera la secuencia cronológica de eventos persistidos en el Event Store de PostgreSQL asociados a un correlationId.
+      operationId: queryTraceability
+      parameters:
+        - name: correlation_id
+          in: path
+          required: true
+          description: Identificador único de correlación (correlationId) asignado a la saga.
+          schema:
+            type: string
+          example: "550e8400-e29b-41d4-a716-446655440000"
+      responses:
+        '200':
+          description: Eventos encontrados exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TraceabilityResponse'
+        '400':
+          description: CorrelationId inválido o vacío.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: "'correlation_id' es obligatorio y no puede estar vacío."
+        '404':
+          description: No existen eventos para el correlationId suministrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: "No se encontraron eventos para correlationId '550e8400-e29b-41d4-a716-446655440000'."
+        '422':
+          description: Error de validación en la solicitud.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+
+  /api/events/{correlation_id}:
+    get:
+      tags:
+        - Traceability
+      summary: Consultar eventos de una saga por correlationId (vía Gateway)
+      description: Alias de la consulta de trazabilidad para enrutamiento directo desde el Gateway conservando el prefijo `/api`.
+      operationId: queryTraceabilityGateway
+      parameters:
+        - name: correlation_id
+          in: path
+          required: true
+          description: Identificador de correlación de la saga.
+          schema:
+            type: string
+          example: "550e8400-e29b-41d4-a716-446655440000"
+      responses:
+        '200':
+          description: Eventos encontrados exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TraceabilityResponse'
+        '400':
+          description: CorrelationId inválido o vacío.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: No existen eventos para el correlationId suministrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Error de validación en la solicitud.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+
+components:
+  schemas:
+    StoredEvent:
+      type: object
+      description: Evento persistido en el Event Store de PostgreSQL.
+      required:
+        - id
+        - type
+        - version
+        - timestamp
+        - correlation_id
+        - routing_key
+        - payload
+        - received_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Identificador único del evento.
+          example: "a1a1a1a1-1111-2222-3333-444444444444"
+        type:
+          type: string
+          description: Tipo semántico de evento según convención <módulo>.<entidad>.<evento>.
+          example: "m1.video.uploaded"
+        version:
+          type: integer
+          description: Versión de esquema.
+          example: 1
+        timestamp:
+          type: string
+          description: Timestamp ISO-8601 del momento de emisión.
+          example: "2026-10-19T22:00:00Z"
+        correlation_id:
+          type: string
+          format: uuid
+          description: Identificador de correlación de la saga.
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        causation_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Identificador del evento causal directo.
+          example: null
+        source:
+          type: string
+          nullable: true
+          description: Módulo emisor.
+          example: "module-1"
+        routing_key:
+          type: string
+          description: Routing key en RabbitMQ.
+          example: "m1.video.uploaded"
+        payload:
+          type: object
+          description: Carga útil con los datos de negocio del evento.
+          additionalProperties: true
+        received_at:
+          type: string
+          format: date-time
+          description: Timestamp oficial de inserción en PostgreSQL.
+          example: "2026-10-19T22:00:01.123456Z"
+
+    TraceabilityResponse:
+      type: object
+      required:
+        - correlationId
+        - events
+      properties:
+        correlationId:
+          type: string
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/StoredEvent'
+
+    ErrorResponse:
+      type: object
+      required:
+        - detail
+      properties:
+        detail:
+          type: string
+          example: "No se encontraron eventos para correlationId '550e8400-e29b-41d4-a716-446655440000'."
+
+    HTTPValidationError:
+      type: object
+      properties:
+        detail:
+          type: array
+          items:
+            $ref: '#/components/schemas/ValidationError'
+
+    ValidationError:
+      type: object
+      required:
+        - loc
+        - msg
+        - type
+      properties:
+        loc:
+          type: array
+          items:
+            anyOf:
+              - type: string
+              - type: integer
+        msg:
+          type: string
+        type:
+          type: string

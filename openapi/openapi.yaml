@@ -1,0 +1,330 @@
+openapi: 3.0.3
+info:
+  title: PubTube Modulo 2 - Traceability & Events API
+  description: >
+    API HTTP del Módulo 2 (Núcleo Pub/Sub y Orquestación) de PubTube.
+    Provee endpoints de comprobación de salud operativa (health check) y consulta de trazabilidad
+    histórica de eventos persistidos en el Event Store de PostgreSQL por correlationId para auditar
+    la ejecución de sagas completas en la plataforma.
+  version: 1.0.0
+  contact:
+    name: Equipo PubTube Módulo 2
+    url: https://github.com/CarlosCienfuegos1/PubTube-Modulo2
+
+servers:
+  - url: http://localhost:8000
+    description: Servidor local de desarrollo (ejecución directa con Uvicorn)
+  - url: http://localhost:8002
+    description: Servidor en contenedor Docker / entorno de integración CI
+  - url: http://localhost:8000/api
+    description: Acceso a través de PubTube API Gateway (Módulo 4)
+
+tags:
+  - name: Health
+    description: Verificación de disponibilidad y liveness del servicio
+  - name: Traceability
+    description: Auditoría y trazabilidad cronológica de eventos por saga
+
+paths:
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Comprobación de salud básica
+      description: Endpoint raíz de liveness probe para balanceadores y monitoreo de infraestructura.
+      operationId: healthCheck
+      responses:
+        '200':
+          description: El servicio se encuentra operativo y respondiendo solicitudes.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthCheckResponse'
+              example:
+                status: "ok"
+
+  /api/events/health:
+    get:
+      tags:
+        - Health
+      summary: Comprobación de salud vía API Gateway
+      description: Ruta invocada por el Gateway (PubTube M4) en los smoke tests de integración y validación de slots.
+      operationId: healthCheckGateway
+      responses:
+        '200':
+          description: El servicio se encuentra operativo a través del Gateway.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthCheckResponse'
+              example:
+                status: "ok"
+
+  /events/health:
+    get:
+      tags:
+        - Health
+      summary: Comprobación de salud en el recurso de eventos
+      description: Alias de salud bajo el contexto de recursos de eventos.
+      operationId: healthCheckEventsResource
+      responses:
+        '200':
+          description: El servicio se encuentra operativo.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthCheckResponse'
+              example:
+                status: "ok"
+
+  /events/{correlation_id}:
+    get:
+      tags:
+        - Traceability
+      summary: Consultar eventos de una saga por correlationId
+      description: >
+        Recupera la secuencia cronológica de eventos persistidos en el Event Store de PostgreSQL
+        asociados a un correlationId específico. Permite auditar el estado y avance de las sagas
+        (video subido -> metadatos actualizados -> publicación planificada -> publicado -> notificado).
+      operationId: queryTraceability
+      parameters:
+        - $ref: '#/components/parameters/CorrelationIdPath'
+      responses:
+        '200':
+          description: Secuencia de eventos encontrada y retornada exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TraceabilityResponse'
+              example:
+                correlationId: "550e8400-e29b-41d4-a716-446655440000"
+                events:
+                  - id: "a1a1a1a1-1111-2222-3333-444444444444"
+                    type: "m1.video.uploaded"
+                    version: 1
+                    timestamp: "2026-10-19T22:00:00Z"
+                    correlation_id: "550e8400-e29b-41d4-a716-446655440000"
+                    causation_id: null
+                    source: "module-1"
+                    routing_key: "m1.video.uploaded"
+                    payload:
+                      contentId: "vid-001"
+                      checksum: "sha256-9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+                      storageUrl: "https://storage.pubtube.internal/videos/vid-001.mp4"
+                    received_at: "2026-10-19T22:00:01.123456Z"
+                  - id: "b2b2b2b2-2222-3333-4444-555555555555"
+                    type: "m1.metadata.updated"
+                    version: 1
+                    timestamp: "2026-10-19T22:01:00Z"
+                    correlation_id: "550e8400-e29b-41d4-a716-446655440000"
+                    causation_id: "a1a1a1a1-1111-2222-3333-444444444444"
+                    source: "module-1"
+                    routing_key: "m1.metadata.updated"
+                    payload:
+                      contentId: "vid-001"
+                      version: 1
+                      title: "Tutorial de Arquitectura EDA"
+                      tags: ["event-driven", "rabbitmq"]
+                      visibility: "public"
+                    received_at: "2026-10-19T22:01:01.456789Z"
+        '400':
+          description: Solicitud inválida por correlationId ausente o compuesto únicamente de espacios en blanco.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: "'correlation_id' es obligatorio y no puede estar vacío."
+        '404':
+          description: No existen eventos asociados al correlationId solicitado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: "No se encontraron eventos para correlationId '550e8400-e29b-41d4-a716-446655440000'."
+        '422':
+          description: Error de validación en la estructura del request HTTP.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+
+  /api/events/{correlation_id}:
+    get:
+      tags:
+        - Traceability
+      summary: Consultar eventos de una saga por correlationId (vía API Gateway)
+      description: Endpoint homólogo para solicitudes enrutadas por el Gateway preservando el prefijo `/api`.
+      operationId: queryTraceabilityGateway
+      parameters:
+        - $ref: '#/components/parameters/CorrelationIdPath'
+      responses:
+        '200':
+          description: Secuencia de eventos encontrada y retornada exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TraceabilityResponse'
+        '400':
+          description: Solicitud inválida por correlationId ausente o en blanco.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: No existen eventos asociados al correlationId solicitado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Error de validación de FastAPI.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+
+components:
+  parameters:
+    CorrelationIdPath:
+      name: correlation_id
+      in: path
+      required: true
+      description: Identificador único de correlación (correlationId) asignado al inicio de la saga.
+      schema:
+        type: string
+      example: "550e8400-e29b-41d4-a716-446655440000"
+
+  schemas:
+    HealthCheckResponse:
+      type: object
+      description: Representación del estado operativo del servicio.
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          description: Indicador de salud operativa.
+          example: "ok"
+
+    StoredEvent:
+      type: object
+      description: Estructura del evento persistido en la tabla 'events' del Event Store de PostgreSQL.
+      required:
+        - id
+        - type
+        - version
+        - timestamp
+        - correlation_id
+        - routing_key
+        - payload
+        - received_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Identificador único universal del evento garantizando idempotencia.
+          example: "a1a1a1a1-1111-2222-3333-444444444444"
+        type:
+          type: string
+          description: Tipo semántico de evento según la convención <módulo>.<entidad>.<evento>.
+          example: "m1.video.uploaded"
+        version:
+          type: integer
+          description: Versión del esquema del contrato del evento.
+          example: 1
+        timestamp:
+          type: string
+          description: Timestamp ISO-8601 del momento de emisión del evento en el origen.
+          example: "2026-10-19T22:00:00Z"
+        correlation_id:
+          type: string
+          format: uuid
+          description: Identificador que unifica todos los eventos pertenecientes a una misma saga.
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        causation_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Identificador del evento antecedente directo que causó la emisión de este evento.
+          example: null
+        source:
+          type: string
+          nullable: true
+          description: Módulo emisor de origen (ej. module-1, module-2, module-3, module-4).
+          example: "module-1"
+        routing_key:
+          type: string
+          description: Clave de enrutamiento con la que el evento transitó por el exchange RabbitMQ.
+          example: "m1.video.uploaded"
+        payload:
+          type: object
+          description: Carga útil con los datos de negocio del evento.
+          additionalProperties: true
+          example:
+            contentId: "vid-001"
+            storageUrl: "https://storage.pubtube.internal/videos/vid-001.mp4"
+        received_at:
+          type: string
+          format: date-time
+          description: Timestamp oficial de inserción y registro en el Event Store.
+          example: "2026-10-19T22:00:01.123456Z"
+
+    TraceabilityResponse:
+      type: object
+      description: Respuesta de consulta de trazabilidad para una saga completa.
+      required:
+        - correlationId
+        - events
+      properties:
+        correlationId:
+          type: string
+          description: El identificador de correlación consultado.
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        events:
+          type: array
+          description: Colección de eventos ordenados cronológicamente por received_at.
+          items:
+            $ref: '#/components/schemas/StoredEvent'
+
+    ErrorResponse:
+      type: object
+      description: Mensaje de error retornado por la API HTTP.
+      required:
+        - detail
+      properties:
+        detail:
+          type: string
+          description: Explicación del error o causa del fallo.
+          example: "No se encontraron eventos para correlationId '550e8400-e29b-41d4-a716-446655440000'."
+
+    HTTPValidationError:
+      type: object
+      description: Estructura de error de validación generada automáticamente por FastAPI.
+      properties:
+        detail:
+          type: array
+          items:
+            $ref: '#/components/schemas/ValidationError'
+
+    ValidationError:
+      type: object
+      required:
+        - loc
+        - msg
+        - type
+      properties:
+        loc:
+          type: array
+          items:
+            anyOf:
+              - type: string
+              - type: integer
+          description: Ubicación jerárquica del parámetro inválido.
+        msg:
+          type: string
+          description: Detalle del error de validación.
+        type:
+          type: string
+          description: Tipo de error de validación.
