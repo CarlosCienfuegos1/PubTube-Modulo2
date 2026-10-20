@@ -11,6 +11,25 @@ permissions:
   packages: write
 
 jobs:
+  saga-tests:
+    name: Saga unit and integration tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout module
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Run Saga tests
+        run: |
+          pip install -r requirements.txt
+          RABBITMQ_USER=ci RABBITMQ_PASS=ci \
+          POSTGRES_DB=ci POSTGRES_USER=ci POSTGRES_PASSWORD=ci \
+          python -m pytest tests/test_saga.py tests/test_saga_integration.py -v
+
   gateway-integration:
     name: Build module and smoke-test through Gateway
     runs-on: ubuntu-latest

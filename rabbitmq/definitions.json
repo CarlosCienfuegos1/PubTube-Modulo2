@@ -146,6 +146,34 @@
             "durable": true,
             "auto_delete": false,
             "arguments": {}
+        },
+        {
+            "name": "q.m2.saga",
+            "vhost": "/",
+            "durable": true,
+            "auto_delete": false,
+            "arguments": {
+                "x-dead-letter-exchange": "pubtube.events.retry",
+                "x-dead-letter-routing-key": "q.m2.saga"
+            }
+        },
+        {
+            "name": "q.m2.saga.retry",
+            "vhost": "/",
+            "durable": true,
+            "auto_delete": false,
+            "arguments": {
+                "x-message-ttl": 30000,
+                "x-dead-letter-exchange": "",
+                "x-dead-letter-routing-key": "q.m2.saga"
+            }
+        },
+        {
+            "name": "q.m2.saga.dlq",
+            "vhost": "/",
+            "durable": true,
+            "auto_delete": false,
+            "arguments": {}
         }
     ],
     "bindings": [
@@ -283,6 +311,54 @@
             "destination": "q.m2.event_store.dlq",
             "destination_type": "queue",
             "routing_key": "q.m2.event_store",
+            "arguments": {}
+        },
+        {
+            "source": "pubtube.events",
+            "vhost": "/",
+            "destination": "q.m2.saga",
+            "destination_type": "queue",
+            "routing_key": "m3.publish.scheduled",
+            "arguments": {}
+        },
+        {
+            "source": "pubtube.events",
+            "vhost": "/",
+            "destination": "q.m2.saga",
+            "destination_type": "queue",
+            "routing_key": "m3.publish.completed",
+            "arguments": {}
+        },
+        {
+            "source": "pubtube.events",
+            "vhost": "/",
+            "destination": "q.m2.saga",
+            "destination_type": "queue",
+            "routing_key": "m3.publish.failed",
+            "arguments": {}
+        },
+        {
+            "source": "pubtube.events",
+            "vhost": "/",
+            "destination": "q.m2.saga",
+            "destination_type": "queue",
+            "routing_key": "m4.team.notified",
+            "arguments": {}
+        },
+        {
+            "source": "pubtube.events.retry",
+            "vhost": "/",
+            "destination": "q.m2.saga.retry",
+            "destination_type": "queue",
+            "routing_key": "q.m2.saga",
+            "arguments": {}
+        },
+        {
+            "source": "pubtube.events.dlq",
+            "vhost": "/",
+            "destination": "q.m2.saga.dlq",
+            "destination_type": "queue",
+            "routing_key": "q.m2.saga",
             "arguments": {}
         }
     ]

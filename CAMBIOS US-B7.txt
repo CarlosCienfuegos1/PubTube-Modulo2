@@ -1,0 +1,17 @@
+US-B7 - Orquestación Saga del flujo de publicación
+
+Implementado:
+- Máquina de estados Saga con correlación obligatoria por correlationId.
+- Estados SCHEDULED, PUBLISHING, WAITING_NOTIFICATION, COMPLETED y FAILED.
+- Historial de transiciones para trazabilidad.
+- Coordinación de publish.scheduled, publish.completed, publish.failed y eventos de notificación.
+- Eventos emitidos: m2.publish.execute, m2.notify.requested y m2.publish.rollback.
+- Compensación ante fallos de publicación y expiración de pasos.
+- Timeout configurable mediante SAGA_STEP_TIMEOUT_SECONDS.
+- Repositorio PostgreSQL saga_instances con historial JSONB e índice de deadlines.
+- Worker RabbitMQ q.m2.saga con idempotencia mediante processed_events.
+- Pruebas unitarias de estados, historial, correlación, fallos y timeout.
+- Pruebas de integración del camino feliz, compensación y timeout con bus/repositorio en memoria.
+- Docker Compose actualizado para levantar el worker junto a RabbitMQ y PostgreSQL.
+- Topología RabbitMQ actualizada con cola Saga, retry, DLQ y bindings.
+- Pipeline CI actualizado para ejecutar pruebas de Saga.

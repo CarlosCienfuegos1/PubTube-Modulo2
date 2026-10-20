@@ -41,6 +41,29 @@ services:
       retries: 5
     restart: unless-stopped
 
+  saga-worker:
+    build:
+      context: .
+    container_name: pubtube-saga-worker
+    command: ["python", "src/saga_worker.py"]
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-admin}
+      RABBITMQ_PASS: ${RABBITMQ_PASS:-admin123}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-pubtube_events}
+      POSTGRES_USER: ${POSTGRES_USER:-pubtube}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pubtube}
+      SAGA_STEP_TIMEOUT_SECONDS: ${SAGA_STEP_TIMEOUT_SECONDS:-300}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   rabbitmq_data:
   postgres_data:

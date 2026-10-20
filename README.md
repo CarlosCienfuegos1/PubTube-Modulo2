@@ -98,6 +98,40 @@ docker exec -it pubtube-postgres psql -U <tu_usuario_postgres> -d <tu_db>
 SELECT type, correlation_id, received_at FROM events ORDER BY received_at;
 ```
 
+## Saga de publicación (US-B7)
+
+La Saga se implementa en los siguientes componentes:
+
+```text
+src/
+  saga.py                 # estados, transiciones, historial y compensación
+  saga_store.py           # persistencia PostgreSQL en saga_instances
+  saga_orchestrator.py    # coordinación de eventos y publicación de comandos
+  saga_worker.py          # consumidor RabbitMQ y scheduler de timeouts
+tests/
+  test_saga.py
+  test_saga_integration.py
+```
+
+El worker consume `q.m2.saga` y conserva el `correlationId` del envelope en
+todas las transiciones y eventos derivados. El flujo es:
+
+`publish.scheduled` -> `PUBLISHING` -> `publish.completed` ->
+`WAITING_NOTIFICATION` -> `m4.team.notified` -> `COMPLETED`.
+
+Un `publish.failed` o un timeout publica `m2.publish.rollback` y lleva la
+Saga a `FAILED`. El timeout por paso se configura con
+`SAGA_STEP_TIMEOUT_SECONDS` (por defecto, 300 segundos). La tabla
+`saga_instances` se crea automáticamente al iniciar el worker; contiene el
+estado actual, deadline, contenido y el historial JSONB de transiciones.
+
+Para levantar el worker junto con las dependencias:
+
+```bash
+docker compose up -d
+docker compose logs -f saga-worker
+```
+
 ## Arquitectura de Mensajería y Catálogo de Eventos
 
 ### Convención de Routing Keys
