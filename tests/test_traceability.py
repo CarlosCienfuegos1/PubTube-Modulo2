@@ -44,3 +44,12 @@ def test_endpoint_indica_ausencia_de_trazabilidad(monkeypatch):
         api.query_traceability("saga-001")
 
     assert error.value.status_code == 404
+
+
+def test_app_registra_rutas_esperadas():
+    paths = {route.path for route in api.app.routes}
+    assert "/health" in paths
+    assert "/api/events/health" in paths
+    assert "/events/health" in paths
+    assert "/events/{correlation_id}" in paths
+    assert "/api/events/{correlation_id}" in paths
