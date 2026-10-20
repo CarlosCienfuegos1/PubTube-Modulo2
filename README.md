@@ -131,6 +131,28 @@ El broker dispone del Exchange principal de tipo **Topic** denominado **`pubtube
 | **`q.m4.experience`** | Módulo 4 | `m1.video.uploaded`<br>`m1.metadata.updated`<br>`m3.publish.scheduled`<br>`m3.publish.completed`<br>`m3.publish.failed`<br>`m4.team.notified` | Actualizar el estado visual en el panel de usuario/equipo y disparar alertas. |
 | **`q.m2.event_store`** | Módulo 2 | `#` *(todos los eventos)* | Auditoría global, almacenamiento histórico de eventos y orquestación de Sagas. |
 
+## Contratos OpenAPI y eventos
+
+La especificación estable de la API está en [`docs/openapi.json`](docs/openapi.json) y
+describe `GET /events`, `GET /events/{correlationId}`, sus respuestas y los estados
+`200`, `404` y `500`. FastAPI también expone la especificación generada en
+`/openapi.json` al ejecutar la API.
+
+El contrato JSON Schema del envelope v1 está en
+[`schemas/event-envelope.json`](schemas/event-envelope.json). Tanto
+`publish_event` como el consumidor validan el envelope completo antes de publicar o
+entregar el evento al callback. La versión actualmente compatible es `1`; un
+timestamp inválido, un `correlationId` ausente o una versión distinta se rechazan.
+
+Para ejecutar solo la suite de contratos localmente:
+
+```bash
+python -m pytest tests/test_contracts.py -v
+```
+
+La misma suite se ejecuta automáticamente en GitHub Actions después de instalar
+`requirements.txt`.
+
 ## Event Store (Persistencia en PostgreSQL)
 
 El Event Store persiste **todos** los eventos que circulan por `pubtube.events` en la tabla `events`, con el siguiente esquema:
@@ -175,6 +197,7 @@ También pueden inspeccionarse y publicarse desde la pestaña **Queues** de Rabb
 - `src/setup_rabbitmq.py`: Script declarativo de topología (Exchanges, Colas, Bindings).
 - `rabbitmq/`: Definiciones de infraestructura (`definitions.json`, `rabbitmq.conf`, `entrypoint.sh`).
 - `schemas/`: JSON Schema oficial del `EventEnvelope`.
+- `docs/openapi.json`: contrato OpenAPI para los endpoints de Event Store.
 - `tests/`: Batería de pruebas unitarias y de integración.
 - `ADR/`: Architecture Decision Records con el historial de decisiones técnicas tomadas.
 - `ROLES.md`: Definición del equipo Scrum encargado de este módulo.

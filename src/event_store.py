@@ -85,10 +85,24 @@ def get_events_by_correlation_id(correlation_id: str) -> list[dict]:
     sql = """
     SELECT id, type, version, timestamp, correlation_id, causation_id, source, routing_key, payload, received_at
     FROM events
-    WHERE correlation_id = %s
+    WHERE correlation_id::text = %s
     ORDER BY received_at ASC
     """
     with get_connection() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(sql, (correlation_id,))
+            return cur.fetchall()
+
+
+def get_all_events() -> list[dict]:
+    """Recupera todos los eventos, ordenados cronológicamente."""
+    sql = """
+    SELECT id, type, version, timestamp, correlation_id, causation_id, source,
+           routing_key, payload, received_at
+    FROM events
+    ORDER BY received_at ASC
+    """
+    with get_connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(sql)
             return cur.fetchall()
