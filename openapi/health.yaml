@@ -1,0 +1,68 @@
+openapi: 3.0.3
+info:
+  title: PubTube Modulo 2 - Health Check API Contract
+  description: Contrato de interfaz OpenAPI para los endpoints de salud, disponibilidad y liveness probes del Módulo 2.
+  version: 1.0.0
+paths:
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Comprobación de salud básica
+      description: Endpoint raíz de comprobación de salud para monitoreo y balanceadores.
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Servicio operativo.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthCheckResponse'
+              example:
+                status: "ok"
+
+  /api/events/health:
+    get:
+      tags:
+        - Health
+      summary: Comprobación de salud vía Gateway
+      description: Endpoint invocado por el API Gateway (PubTube M4) en los smoke tests de integración CI.
+      operationId: healthCheckGateway
+      responses:
+        '200':
+          description: Servicio operativo a través del Gateway.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthCheckResponse'
+              example:
+                status: "ok"
+
+  /events/health:
+    get:
+      tags:
+        - Health
+      summary: Comprobación de salud en recurso de eventos
+      description: Alias de salud bajo el prefijo del recurso de eventos.
+      operationId: healthCheckEventsResource
+      responses:
+        '200':
+          description: Servicio operativo.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthCheckResponse'
+              example:
+                status: "ok"
+
+components:
+  schemas:
+    HealthCheckResponse:
+      type: object
+      description: Estado de salud del servicio.
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          example: "ok"

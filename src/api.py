@@ -4,18 +4,33 @@ from fastapi import FastAPI, HTTPException
 
 from traceability import get_traceability_by_correlation_id
 
-app = FastAPI(title="PubTube Traceability API")
+app = FastAPI(
+    title="PubTube Traceability API",
+    description="API HTTP del Módulo 2 para verificación de salud y consulta de trazabilidad histórica de eventos por correlationId.",
+    version="1.0.0",
+)
 
-@app.get("/health")
-@app.get("/api/events/health")
-@app.get("/events/health")
+@app.get("/health", tags=["Health"])
+@app.get("/api/events/health", tags=["Health"])
+@app.get("/events/health", tags=["Health"])
 def health_check():
     return {"status": "ok"}
 
 
 
 @app.get(
+    "/api/events/{correlation_id}",
+    tags=["Traceability"],
+    summary="Consultar trazabilidad por correlationId (vía Gateway)",
+    responses={
+        400: {"description": "El correlationId es obligatorio."},
+        404: {"description": "No hay eventos para el correlationId indicado."},
+    },
+)
+@app.get(
     "/events/{correlation_id}",
+    tags=["Traceability"],
+    summary="Consultar trazabilidad por correlationId",
     responses={
         400: {"description": "El correlationId es obligatorio."},
         404: {"description": "No hay eventos para el correlationId indicado."},
