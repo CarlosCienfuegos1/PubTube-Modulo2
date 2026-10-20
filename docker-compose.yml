@@ -57,6 +57,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-pubtube}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pubtube}
       SAGA_STEP_TIMEOUT_SECONDS: ${SAGA_STEP_TIMEOUT_SECONDS:-300}
+      SAGA_MAX_STEP_RETRIES: ${SAGA_MAX_STEP_RETRIES:-2}
     depends_on:
       rabbitmq:
         condition: service_healthy

@@ -38,7 +38,7 @@ def test_saga_records_happy_path_history_and_transitions():
 
 
 def test_saga_compensates_publication_failure():
-    saga = SagaInstance.start(event("publish.scheduled"), 60)
+    saga = SagaInstance.start(event("publish.scheduled"), 60, max_step_retries=0)
     emitted = []
     saga.handle_event(
         event("m3.publish.failed", payload={"reason": "quota"}),
@@ -51,6 +51,29 @@ def test_saga_compensates_publication_failure():
     assert emitted[0][1]["reason"] == "publication failed"
 
 
+def test_saga_retries_publication_before_compensation():
+    saga = SagaInstance.start(event("publish.scheduled"), 60, max_step_retries=1)
+    emitted = []
+    saga.handle_event(
+        event("publish.failed", payload={"reason": "transient"}),
+        60,
+        lambda key, payload, causation: emitted.append((key, payload)),
+        max_step_retries=1,
+    )
+    assert saga.state == SagaState.PUBLISHING
+    assert emitted[-1][0] == "m2.publish.execute"
+    assert emitted[-1][1]["attempt"] == 2
+
+    saga.handle_event(
+        event("publish.failed", payload={"reason": "permanent"}),
+        60,
+        lambda key, payload, causation: emitted.append((key, payload)),
+        max_step_retries=1,
+    )
+    assert saga.state == SagaState.FAILED
+    assert emitted[-1][0] == "m2.publish.rollback"
+
+
 def test_saga_timeout_compensates_waiting_notification():
     saga = SagaInstance.start(event("publish.scheduled"), 60)
     saga.handle_event(
@@ -59,23 +82,30 @@ def test_saga_timeout_compensates_waiting_notification():
         lambda *_: None,
     )
     emitted = []
+    saga.deadline = datetime.now(timezone.utc) - timedelta(seconds=1)
     expired = saga.handle_timeout(
-        datetime.now(timezone.utc) + timedelta(seconds=1),
+        datetime.now(timezone.utc),
         lambda key, payload, causation: emitted.append((key, payload)),
     )
 
-    assert expired is False
+    assert expired is True
+    assert saga.state == SagaState.WAITING_NOTIFICATION
     saga.deadline = datetime.now(timezone.utc) - timedelta(seconds=1)
     assert saga.handle_timeout(
         datetime.now(timezone.utc),
         lambda key, payload, causation: emitted.append((key, payload)),
-    )
+    ) is True
+    saga.deadline = datetime.now(timezone.utc) - timedelta(seconds=1)
+    assert saga.handle_timeout(
+        datetime.now(timezone.utc),
+        lambda key, payload, causation: emitted.append((key, payload)),
+    ) is True
     assert saga.state == SagaState.FAILED
     assert emitted[-1][0] == "m2.publish.rollback"
 
 
 def test_saga_compensates_notification_failure():
-    saga = SagaInstance.start(event("publish.scheduled"), 60)
+    saga = SagaInstance.start(event("publish.scheduled"), 60, max_step_retries=0)
     saga.handle_event(event("publish.completed"), 60, lambda *_: None)
     emitted = []
 

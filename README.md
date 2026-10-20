@@ -121,7 +121,9 @@ todas las transiciones y eventos derivados. El flujo es:
 
 Un `publish.failed` o un timeout publica `m2.publish.rollback` y lleva la
 Saga a `FAILED`. El timeout por paso se configura con
-`SAGA_STEP_TIMEOUT_SECONDS` (por defecto, 300 segundos). La tabla
+`SAGA_STEP_TIMEOUT_SECONDS` (por defecto, 300 segundos). Los fallos
+transitorios y timeouts reintentan cada paso hasta `SAGA_MAX_STEP_RETRIES`
+(por defecto, 2); luego se emite el rollback. La tabla
 `saga_instances` se crea automáticamente al iniciar el worker; contiene el
 estado actual, deadline, contenido y el historial JSONB de transiciones.
 

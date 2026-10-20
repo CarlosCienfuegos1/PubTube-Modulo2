@@ -55,6 +55,7 @@ def test_orchestrator_failure_emits_rollback():
     published = []
     orchestrator = SagaOrchestrator(
         MemoryRepository(),
+        max_step_retries=0,
         publisher=lambda **kwargs: published.append(kwargs),
     )
     orchestrator.handle(envelope("publish.scheduled"))
@@ -70,6 +71,7 @@ def test_orchestrator_timeout_emits_rollback():
     orchestrator = SagaOrchestrator(
         repository,
         timeout_seconds=30,
+        max_step_retries=0,
         publisher=lambda **kwargs: published.append(kwargs),
     )
     orchestrator.handle(envelope("publish.scheduled"))

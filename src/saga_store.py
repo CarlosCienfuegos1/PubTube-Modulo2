@@ -18,9 +18,12 @@ CREATE TABLE IF NOT EXISTS saga_instances (
     state TEXT NOT NULL,
     content_id TEXT,
     deadline TIMESTAMPTZ,
+    step_attempts JSONB NOT NULL DEFAULT '{}'::jsonb,
     history JSONB NOT NULL DEFAULT '[]'::jsonb,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+ALTER TABLE saga_instances
+    ADD COLUMN IF NOT EXISTS step_attempts JSONB NOT NULL DEFAULT '{}'::jsonb;
 CREATE INDEX IF NOT EXISTS idx_saga_instances_deadline
     ON saga_instances (deadline) WHERE deadline IS NOT NULL;
 """
@@ -55,13 +58,14 @@ class SagaRepository:
         ]
         sql = """
         INSERT INTO saga_instances
-            (correlation_id, state, content_id, deadline, history, updated_at)
-        VALUES (%s, %s, %s, %s, %s, now())
+            (correlation_id, state, content_id, deadline, history, step_attempts, updated_at)
+        VALUES (%s, %s, %s, %s, %s, %s, now())
         ON CONFLICT (correlation_id) DO UPDATE SET
             state = EXCLUDED.state,
             content_id = EXCLUDED.content_id,
             deadline = EXCLUDED.deadline,
             history = EXCLUDED.history,
+            step_attempts = EXCLUDED.step_attempts,
             updated_at = now()
         """
         with get_connection() as conn:
@@ -72,12 +76,13 @@ class SagaRepository:
                     saga.content_id,
                     saga.deadline,
                     Jsonb(history),
+                    Jsonb(saga.step_attempts),
                 ))
             conn.commit()
 
     def get(self, correlation_id: str) -> Optional[SagaInstance]:
         sql = """
-        SELECT correlation_id, state, content_id, deadline, history
+        SELECT correlation_id, state, content_id, deadline, history, step_attempts
         FROM saga_instances WHERE correlation_id = %s
         """
         with get_connection() as conn:
@@ -101,11 +106,13 @@ class SagaRepository:
             content_id=row[2],
             deadline=row[3],
             history=history,
+            step_attempts=row[5],
+            max_step_retries=2,
         )
 
     def due(self, now: datetime) -> list[SagaInstance]:
         sql = """
-        SELECT correlation_id, state, content_id, deadline, history
+        SELECT correlation_id, state, content_id, deadline, history, step_attempts
         FROM saga_instances
         WHERE deadline IS NOT NULL
           AND deadline <= %s
@@ -133,4 +140,6 @@ class SagaRepository:
                 )
                 for item in data
             ],
+            step_attempts=row[5],
+            max_step_retries=2,
         )

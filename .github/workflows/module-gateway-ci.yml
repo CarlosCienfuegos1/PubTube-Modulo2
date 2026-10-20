@@ -25,10 +25,21 @@ jobs:
 
       - name: Run Saga tests
         run: |
+          set -euo pipefail
+          trap 'docker compose down -v' EXIT
+          export RABBITMQ_USER=ci
+          export RABBITMQ_PASS=ci
+          export POSTGRES_DB=ci
+          export POSTGRES_USER=ci
+          export POSTGRES_PASSWORD=ci
+          export RABBITMQ_HOST=localhost
+          export POSTGRES_HOST=localhost
+          docker compose up -d --wait rabbitmq postgres
           pip install -r requirements.txt
-          RABBITMQ_USER=ci RABBITMQ_PASS=ci \
-          POSTGRES_DB=ci POSTGRES_USER=ci POSTGRES_PASSWORD=ci \
-          python -m pytest tests/test_saga.py tests/test_saga_integration.py -v
+          python -m pytest \
+            tests/test_saga.py \
+            tests/test_saga_integration.py \
+            tests/test_saga_e2e.py -v
 
   gateway-integration:
     name: Build module and smoke-test through Gateway
