@@ -20,6 +20,7 @@ def get_connection() -> psycopg.Connection:
         dbname=POSTGRES_DB,
         user=POSTGRES_USER,
         password=POSTGRES_PASSWORD,
+        connect_timeout=5,
     )
 
 

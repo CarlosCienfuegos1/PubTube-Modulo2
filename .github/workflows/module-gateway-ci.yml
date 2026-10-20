@@ -26,20 +26,22 @@ jobs:
       - name: Run Saga tests
         run: |
           set -euo pipefail
-          trap 'docker compose down -v' EXIT
+          trap 'docker compose logs rabbitmq postgres || true; docker compose down -v || true' EXIT
           export RABBITMQ_USER=ci
           export RABBITMQ_PASS=ci
           export POSTGRES_DB=ci
           export POSTGRES_USER=ci
           export POSTGRES_PASSWORD=ci
-          export RABBITMQ_HOST=localhost
-          export POSTGRES_HOST=localhost
-          docker compose up -d --wait rabbitmq postgres
+          export RABBITMQ_HOST=127.0.0.1
+          export POSTGRES_HOST=127.0.0.1
+          docker compose up -d --wait --wait-timeout 180 rabbitmq postgres
           pip install -r requirements.txt
           python -m pytest \
             tests/test_saga.py \
             tests/test_saga_integration.py \
             tests/test_saga_e2e.py -v
+        env:
+          COMPOSE_FILE: docker-compose.yml
 
   gateway-integration:
     name: Build module and smoke-test through Gateway
@@ -60,11 +62,13 @@ jobs:
 
       - name: Run Tests
         run: |
+          set -euo pipefail
+          trap 'docker compose logs rabbitmq postgres || true; docker compose down -v || true' EXIT
           cp .env.example .env
-          docker compose up -d
+          sed -i 's/^RABBITMQ_HOST=.*/RABBITMQ_HOST=127.0.0.1/; s/^POSTGRES_HOST=.*/POSTGRES_HOST=127.0.0.1/' .env
+          docker compose up -d --wait --wait-timeout 180 rabbitmq postgres
           pip install -r requirements.txt pytest httpx
           python -m pytest tests/ -v
-          docker compose down
 
       - name: Validate module integration settings
         id: settings
