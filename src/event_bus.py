@@ -185,13 +185,50 @@ def publish_event(
         source=source,
         payload=payload,
     )
+    return publish_envelope(envelope, routing_key=routing_key, confirm_delivery=False)
+
+
+def publish_envelope(
+    envelope: EventEnvelope,
+    routing_key: Optional[str] = None,
+    confirm_delivery: bool = False,
+) -> EventEnvelope:
+    """
+    Publica un EventEnvelope ya existente al exchange 'pubtube.events'.
+
+    Permite publicar un envelope reconstruido (por ejemplo desde el Outbox)
+    preservando su ID original, correlationId y causationId, evitando la
+    generación de nuevos IDs que romperían la idempotencia aguas abajo (US-B4).
+
+    Args:
+        envelope:         Instancia válida de EventEnvelope.
+        routing_key:      Routing key destino. Si es None o vacía, usa envelope.type.
+        confirm_delivery: Si True, activa confirmaciones de entrega (Publisher Confirms)
+                          en el canal pika para asegurar confirmación del broker (US-B5b).
+
+    Returns:
+        El EventEnvelope publicado.
+
+    Raises:
+        ValueError: si envelope o routing_key no son válidos.
+        pika.exceptions.AMQPConnectionError: si falla la conexión con el broker.
+    """
+    if envelope is None or not isinstance(envelope, EventEnvelope):
+        raise ValueError("Se requiere una instancia válida de EventEnvelope.")
+
+    rk = routing_key.strip() if (routing_key and routing_key.strip()) else envelope.type
+    if not rk:
+        raise ValueError("La routing key no puede estar vacía.")
+
     body = envelope.serialize()
 
     # _connect_with_retry ya maneja los reintentos de conexión con backoff.
-    # Si el canal o la publicación falla después de conectar (error de red),
-    # propagamos directamente ya que es un error puntual tras una conexión exitosa.
     conn = _connect_with_retry()
     channel = conn.channel()
+
+    if confirm_delivery:
+        channel.confirm_delivery()
+
     channel.exchange_declare(
         exchange=EXCHANGE_NAME,
         exchange_type=EXCHANGE_TYPE,
@@ -199,16 +236,16 @@ def publish_event(
     )
     channel.basic_publish(
         exchange=EXCHANGE_NAME,
-        routing_key=routing_key,
+        routing_key=rk,
         body=body,
         properties=pika.BasicProperties(
             delivery_mode=2,           # persistente: sobrevive a reinicios del broker
             content_type="application/json",
-            correlation_id=correlation_id,
+            correlation_id=envelope.correlationId,
         ),
     )
     conn.close()
-    logger.info("Evento '%s' publicado. ID: %s", routing_key, envelope.id)
+    logger.info("Envelope '%s' publicado. ID: %s", rk, envelope.id)
     return envelope
 
 

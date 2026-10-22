@@ -39,7 +39,7 @@ class EventEnvelope(BaseModel):
         return cls.model_validate_json(json_str)
 
     @classmethod
-    def create_child_from(cls, parent_event: 'EventEnvelope', event_type: str, payload: Dict[str, Any] = None) -> 'EventEnvelope':
+    def create_child_from(cls, parent_event: 'EventEnvelope', event_type: str, payload: Optional[Dict[str, Any]] = None) -> 'EventEnvelope':
         """
         Crea un nuevo evento como consecuencia de otro (propagación).
         - Conserva el mismo correlationId para trazar el flujo completo.
